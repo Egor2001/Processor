@@ -386,8 +386,8 @@ public:
                         CRS_IF_CANARY_GUARD("    beg_canary_[%s] : %#X \n")
                         CRS_IF_HASH_GUARD  ("    hash_value_[%s] : %#X \n")
                         "    \n"
-                        "    capasity_ : %d\n"
-                        "    size_     : %d\n"
+                        "    capasity_     : %d \n"
+                        "    size_         : %d \n"
                         "    byte_storage_ : %p \n"
                         "    { \n"
                         //CRS_IF_CANARY_GUARD("        canary[%s] : %#X \n")
@@ -395,7 +395,7 @@ public:
                         //CRS_IF_CANARY_GUARD("        canary[%s] : %#X \n")
                         "    } \n"
                         "    \n"
-                        "    buffer_ : %p \n"
+                        "    buffer_       : %p \n"
                         "    \n"
                         CRS_IF_CANARY_GUARD("    end_canary_[%s] : %#X \n")
                         "} \n",

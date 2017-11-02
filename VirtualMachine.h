@@ -15,34 +15,40 @@ namespace course {
 
 using namespace course_stack;
 
+enum ERegisters
+{
+    REG_AX = 0, REG_BX = 1, REG_CX = 2, REG_DX = 3
+};
+
+enum ECommands
+{
+    CMD_PUSH     = 0x1,
+    CMD_PUSH_REG = 0x2,
+    CMD_POP      = 0x3,
+    CMD_DUP      = 0x4,
+
+    CMD_FADD  = 0x5,
+    CMD_FSUB  = 0x6,
+    CMD_FMUL  = 0x7,
+    CMD_FDIV  = 0x8,
+
+    CMD_FSIN  = 0x9,
+    CMD_FCOS  = 0xA,
+    CMD_FSQRT = 0xB,
+
+    CMD_HLT = 0xC,
+
+    //are used in input handler
+    CDM_IN   = 0x10,
+    CMD_OUT  = 0x11,
+    CDM_OK   = 0x12,
+    CMD_DUMP = 0x13
+};
+
 class CProcessor
 {
 public:
-    enum ERegisters
-    {
-        AX = 0, BX = 1, CX = 2, DX = 3
-    };
-
-    enum class ECommands
-    {
-        PUSH     = 0x1,
-        PUSH_REG = 0x2,
-        POP      = 0x3,
-        DUP      = 0x4,
-
-        FADD  = 0x5,
-        FSUB  = 0x6,
-        FMUL  = 0x7,
-        FDIV  = 0x8,
-
-        FSIN  = 0x9,
-        FCOS  = 0xA,
-        FSQRT = 0xB,
-
-        HLT = 0xF4
-    };
-
-    typedef uint32_t type_t_;
+    typedef uint32_t word_t_;
     static const size_t REGISTERS_NUM = 4;
 
     static const size_t CANARY_VALUE = 0xFF00FF00;//TODO: "CProcessor"_crs_hash;
@@ -70,7 +76,7 @@ public:
         CRS_IF_HASH_GUARD  (hash_value_ = 0;)
 
         proc_stack_.clear();
-        memset(proc_registers_, 0x00, REGISTERS_NUM*sizeof(type_t_));
+        memset(proc_registers_, 0x00, REGISTERS_NUM*sizeof(word_t_));
     }
 
 private:
@@ -80,80 +86,87 @@ private:
         size_t result = proc_stack_.get_hash_value();
 
         result ^= (CRS_IF_CANARY_GUARD((beg_canary_ ^ end_canary_) ^)
-                   (*(const type_t_*)(&proc_registers_[ERegisters::AX]) << 0x8) ^
-                   (*(const type_t_*)(&proc_registers_[ERegisters::BX]) << 0x4) ^
-                   (*(const type_t_*)(&proc_registers_[ERegisters::CX]) >> 0x4) ^
-                   (*(const type_t_*)(&proc_registers_[ERegisters::DX]) >> 0x8));
+                   (*(const word_t_*)(&proc_registers_[ERegisters::REG_AX]) << 0x8) ^
+                   (*(const word_t_*)(&proc_registers_[ERegisters::REG_BX]) << 0x4) ^
+                   (*(const word_t_*)(&proc_registers_[ERegisters::REG_CX]) >> 0x4) ^
+                   (*(const word_t_*)(&proc_registers_[ERegisters::REG_DX]) >> 0x8));
 
         return result;
     }
     )//CRS_IF_HASH_GUARD
 
 public:
-    bool proc_command(ECommands command, type_t_ arg = std::numeric_limits<type_t_>::max())
+    bool proc_command(ECommands command, word_t_ arg = std::numeric_limits<word_t_>::max())
     {
         CRS_IF_GUARD(CRS_BEG_CHECK();)
 
         switch (command)
         {
-            case ECommands::PUSH:
+            case CMD_PUSH:
                 CRS_STATIC_LOG("proc_command [PUSH %f]", *(float*)(&arg));
                 proc_stack_.push(*(float*)(&arg));
                 break;
 
-            case ECommands::PUSH_REG:
+            case CMD_PUSH_REG:
                 CRS_STATIC_LOG("proc_command [PUSH_REG %u]", arg);
                 proc_stack_.push(proc_registers_[arg]);
                 break;
 
-            case ECommands::POP:
+            case CMD_POP:
                 CRS_STATIC_LOG("proc_command [POP %u]", arg);
                 proc_registers_[arg] = proc_stack_.pop();
                 break;
 
-            case ECommands::DUP:
+            case CMD_DUP:
                 CRS_STATIC_MSG("proc_command [DUP]");
                 proc_stack_.push(proc_stack_.top());
                 break;
 
-            case ECommands::FADD:
+            case CMD_FADD:
                 CRS_STATIC_MSG("proc_command [FADD]");
                 proc_stack_.push(proc_stack_.pop() + proc_stack_.pop());
                 break;
 
-            case ECommands::FSUB:
+            case CMD_FSUB:
                 CRS_STATIC_MSG("proc_command [FSUB]");
                 proc_stack_.push(proc_stack_.pop() - proc_stack_.pop());
                 break;
 
-            case ECommands::FMUL:
+            case CMD_FMUL:
                 CRS_STATIC_MSG("proc_command [FMUL]");
                 proc_stack_.push(proc_stack_.pop() * proc_stack_.pop());
                 break;
 
-            case ECommands::FDIV:
+            case CMD_FDIV:
                 CRS_STATIC_MSG("proc_command [FDIV]");
                 proc_stack_.push(proc_stack_.pop() / proc_stack_.pop());
                 break;
 
-            case ECommands::FSIN:
+            case CMD_FSIN:
                 CRS_STATIC_MSG("proc_command [FSIN]");
                 proc_stack_.push(sinf (proc_stack_.pop()));
                 break;
 
-            case ECommands::FCOS:
+            case CMD_FCOS:
                 CRS_STATIC_MSG("proc_command [FCOS]");
                 proc_stack_.push(cosf (proc_stack_.pop()));
                 break;
 
-            case ECommands::FSQRT:
+            case CMD_FSQRT:
                 CRS_STATIC_MSG("proc_command [FSQRT]");
                 proc_stack_.push(sqrtf(proc_stack_.pop()));
                 break;
 
-            case ECommands::HLT:
+            case CMD_HLT:
                 CRS_STATIC_MSG("proc_command [HLT]");
                 return false;
+
+            case CMD_IN:
+            case CMD_OUT:
+            case CMD_OK:
+            case CMD_DUMP:
+                CRS_STATIC_MSG("proc_command: [input handle command]");
+                break;
 
             default:
                 CRS_STATIC_MSG("proc_command: default case statement reached");
@@ -168,6 +181,32 @@ public:
         return true;
     }
 
+    float pop_out()
+    {
+        CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+        float result = proc_stack_.pop();
+
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
+        CRS_IF_GUARD(CRS_END_CHECK();)
+
+        return result;
+    }
+
+    float reg_out(ERegisters reg_idx) const
+    {
+        CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+        if (reg_idx >= REGISTERS_NUM)
+            throw CCourseException("register index is out of range");
+
+        CRS_IF_GUARD(CRS_END_CHECK();)
+
+        return proc_registers_[reg_idx];
+    }
+
+public:
     void assert_ok() const
     {
         if (!ok())
@@ -204,10 +243,10 @@ public:
                         CRS_IF_HASH_GUARD  ((hash_value_ == calc_hash_value_() ? "OK" : "ERROR"), hash_value_,)
 
                         proc_stack_.size(),
-                        proc_registers_[ERegisters::AX],
-                        proc_registers_[ERegisters::BX],
-                        proc_registers_[ERegisters::CX],
-                        proc_registers_[ERegisters::DX]
+                        proc_registers_[ERegisters::REG_AX],
+                        proc_registers_[ERegisters::REG_BX],
+                        proc_registers_[ERegisters::REG_CX],
+                        proc_registers_[ERegisters::REG_DX]
 
                         CRS_IF_CANARY_GUARD(, (end_canary_ == CANARY_VALUE ? "OK" : "ERROR"), end_canary_));
 
