@@ -32,11 +32,11 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 		</Compiler>
+		<Unit filename="InputHandler.h" />
+		<Unit filename="Stack/CourseException.h" />
 		<Unit filename="Stack/DynamicStack.h" />
-		<Unit filename="Stack/Logger.cpp" />
 		<Unit filename="Stack/Logger.h" />
 		<Unit filename="Stack/Stack.h" />
-		<Unit filename="Stack/StackException.h" />
 		<Unit filename="Stack/UnitTest.h" />
 		<Unit filename="VirtualMachine.h" />
 		<Unit filename="main.cpp" />
