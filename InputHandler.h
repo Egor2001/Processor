@@ -6,7 +6,6 @@
 #include "Stack/CourseException.h"
 #include "Stack/Guard.h"
 
-#include "VirtualMachine.h"
 
 namespace course {
 
@@ -17,7 +16,6 @@ class CInputHandler
 public:
     struct SInstruction
     {
-        ECommands command;
         CProcessor::word_t_ arg;
     };
 
@@ -49,58 +47,6 @@ public:
         else if (!strcmp(command_str, "pop"))
         {
 
-        }
-        else if (!strcmp(command_str, "dup"))
-        {
-            return { CMD_DUP, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fadd"))
-        {
-            return { CMD_FADD, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fsub"))
-        {
-            return { CMD_FSUB, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fmul"))
-        {
-            return { CMD_FMUL, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fdiv"))
-        {
-            return { CMD_FDIV, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fsin"))
-        {
-            return { CMD_FSIN, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fcos"))
-        {
-            return { CMD_FCOS, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fsqrt"))
-        {
-            return { CMD_FSQRT, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "hlt"))
-        {
-            return { CMD_HLT, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "in"))
-        {
-            return { CMD_IN, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "out"))
-        {
-            return { CMD_OUT, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "ok"))
-        {
-            return { CMD_OK, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "dump"))
-        {
-            return { CMD_DUMP, static_cast<CProcessor::word_t_>(-1) };
         }
         else
         {
