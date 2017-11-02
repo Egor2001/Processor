@@ -6,7 +6,7 @@
 #include "Stack/CourseException.h"
 #include "Stack/Guard.h"
 
-#include "VirtualMachine.h"
+#include "ProcessorEnums.h"
 
 namespace course {
 
@@ -17,7 +17,7 @@ class CInputHandler
 public:
     struct SInstruction
     {
-        ECommands command;
+        ECommand command;
         CProcessor::word_t_ arg;
     };
 
@@ -38,70 +38,49 @@ public:
 
         fscanf(input_file "%15s", command_str);
 
+        #define HANDLE_SIMPLE_CMD_(recognised_str, command_str, command) \
+            else if (!strcmp(recognised_str, command_str)) \
+            { \
+                CRS_STATIC_MSG(CRS_STRINGIZE(command) " command recognized"); \
+                return { command, static_cast<CProcessor::word_t_>(-1) }; \
+            }
+
         if (!strcmp(command_str, "push"))
         {
             char arg_str[32] = "";
 
             fscanf(input_file " %31s", arg_str);
 
+            #define HANDLE_PUSH_MODE_(recognised_mode, mode) \
+                else if (recognised_mode == mode) \
+                { \
+                    CRS_STATIC_MSG(CRS_STRINGIZE(mode) " push mode recognized"); \
+                }
 
+            #undef HANDLE_PUSH_MODE_
         }
         else if (!strcmp(command_str, "pop"))
         {
 
         }
-        else if (!strcmp(command_str, "dup"))
-        {
-            return { CMD_DUP, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fadd"))
-        {
-            return { CMD_FADD, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fsub"))
-        {
-            return { CMD_FSUB, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fmul"))
-        {
-            return { CMD_FMUL, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fdiv"))
-        {
-            return { CMD_FDIV, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fsin"))
-        {
-            return { CMD_FSIN, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fcos"))
-        {
-            return { CMD_FCOS, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "fsqrt"))
-        {
-            return { CMD_FSQRT, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "hlt"))
-        {
-            return { CMD_HLT, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "in"))
-        {
-            return { CMD_IN, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "out"))
-        {
-            return { CMD_OUT, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "ok"))
-        {
-            return { CMD_OK, static_cast<CProcessor::word_t_>(-1) };
-        }
-        else if (!strcmp(command_str, "dump"))
-        {
-            return { CMD_DUMP, static_cast<CProcessor::word_t_>(-1) };
-        }
+
+        HANDLE_SIMPLE_CMD_(command_str, "dup",   CMD_DUP)
+
+        HANDLE_SIMPLE_CMD_(command_str, "fadd",  CMD_FADD)
+        HANDLE_SIMPLE_CMD_(command_str, "fsub",  CMD_FSUB)
+        HANDLE_SIMPLE_CMD_(command_str, "fmul",  CMD_FMUL)
+        HANDLE_SIMPLE_CMD_(command_str, "fdiv",  CMD_FDIV)
+
+        HANDLE_SIMPLE_CMD_(command_str, "fsin",  CMD_FSIN)
+        HANDLE_SIMPLE_CMD_(command_str, "fcos",  CMD_FCOS)
+        HANDLE_SIMPLE_CMD_(command_str, "fsqrt", CMD_FSQRT)
+
+        HANDLE_SIMPLE_CMD_(command_str, "hlt",  CMD_HLT)
+        HANDLE_SIMPLE_CMD_(command_str, "in",   CMD_IN)
+        HANDLE_SIMPLE_CMD_(command_str, "out",  CMD_OUT)
+        HANDLE_SIMPLE_CMD_(command_str, "ok",   CMD_OK)
+        HANDLE_SIMPLE_CMD_(command_str, "dump", CMD_DUMP)
+
         else
         {
             char error_str[CCourseException::MAX_MSG_LEN] = "handle input error: "
@@ -109,6 +88,8 @@ public:
 
             throw CCourseException(strncat(error_str, command_str, CCourseException::MAX_MSG_LEN));
         }
+
+        #undef HANDLE_SIMPLE_CMD_
 
         return { CMD_HLT, static_cast<CProcessor::word_t_>(-1) };
     }
