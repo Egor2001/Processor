@@ -6,7 +6,9 @@
 #include <cstring>
 #include <cctype>
 
-#include "Translator.h"
+#include ""
+
+#include "ProcessorEnums.h"
 
 namespace course {
 
@@ -15,6 +17,8 @@ using namespace course_stack;
 class CInputHandler
 {
 public:
+    using word_t_ = CProcessor::word_t_;
+
     static const size_t MAX_CMD_STR_LEN = 64;
 
     static const size_t CANARY_VALUE = "CInputHandler"_crs_hash;
@@ -41,9 +45,9 @@ private:
         for (const auto& instruction : instruction_vec_)
         {
             result ^= (instruction.command ^
-                       (instruction.mode << 1*sizeof(UWord)/4) ^
-                       (instruction.mode << 2*sizeof(UWord)/4) ^
-                       (instruction.mode << 3*sizeof(UWord)/4));
+                       (instruction.mode << 1*sizeof(word_t_)/4) ^
+                       (instruction.mode << 2*sizeof(word_t_)/4) ^
+                       (instruction.mode << 3*sizeof(word_t_)/4));
         }
 
         result ^= static_cast<uintptr_t>(input_file_);
@@ -69,7 +73,7 @@ public:
         if (!strcmp(command_str, "push"))
         {
             EPushMode push_mode = -1;
-            UWord arg = {}, add = {};
+            word_t_ arg = {}, add = {};
 
             sscanf(instruction_str, "push %u", &push_mode);
 
@@ -103,7 +107,7 @@ public:
         else if (!strcmp(command_str, "pop"))
         {
             EPopMode pop_mode = -1;
-            UWord arg = {}, add = {};
+            word_t_ arg = {}, add = {};
 
             sscanf(instruction_str, "pop %u", &pop_mode);
 

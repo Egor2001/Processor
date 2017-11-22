@@ -25,7 +25,7 @@ public:
     typedef const type_t_* const_pointer_t_;
 
 public:
-    static const size_t CANARY_VALUE = 0xFF00FF00;//TODO: "CStaticStack"_crs_hash;
+    static const size_t CANARY_VALUE = "CStaticStack"_crs_hash;
 
 public:
     CStaticStack():

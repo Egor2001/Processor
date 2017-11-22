@@ -9,19 +9,106 @@
 #include <typeinfo>
 #include <cstring>
 
-#include "Macro.h"
+#define CRS_POISON_INT(var) \
+    (var = std::numeric_limits<std::remove_reference<decltype(var)>::type>::max())
 
-namespace course_stack {
+#define CRS_POISON_FLOAT(var) \
+    (var = std::numeric_limits<std::remove_reference<decltype(var)>::type>::quiet_NaN())
 
-constexpr size_t crs_hash_helper(const char* str, std::size_t str_len)
-{
-    return (str_len ? crs_hash_helper(str+1, str_len-1) ^
-                      (*str << str_len%(sizeof(size_t)/sizeof(char))) : 0);
+#define CRS_IS_POISON_INT(var) \
+    (var == std::numeric_limits<std::remove_reference<decltype(var)>::type>::max())
+
+#define CRS_IS_POISON_FLOAT(var) (std::isnan(var))
+
+#define CRS_STRINGIZE_HELPER(name) #name
+#define CRS_STRINGIZE(name) CRS_STRINGIZE_HELPER(name)
+
+#ifdef CRS_LOGSTAMP
+    #define CRS_STATIC_MSG(message_literal) \
+        CLogger::instance()->print_str("[FILE: " __FILE__ ", LINE:" CRS_STRINGIZE(__LINE__) "] " \
+                                       "[" message_literal "] \n")
+
+    #define CRS_STATIC_LOG(format_literal, ...) \
+        CLogger::instance()->print_str("[FILE: " __FILE__ ", LINE:" CRS_STRINGIZE(__LINE__) "] " \
+                                       "[" format_literal "] \n", __VA_ARGS__)
+
+#else
+    #define CRS_STATIC_MSG(message_literal) \
+        CLogger::instance()->print_str("[" message_literal "] \n")
+
+    #define CRS_STATIC_LOG(format_literal, ...) \
+        CLogger::instance()->print_str("[" format_literal "] \n", __VA_ARGS__)
+
+#endif //CRS_LOGSTAMP
+
+#define CRS_STATIC_DUMP(format_literal, ...) \
+    CLogger::instance()->print_str(format_literal " \n", __VA_ARGS__)
+
+
+#define CRS_CONSTRUCT_CHECK() \
+{ \
+    CRS_STATIC_LOG("CONSTRUCTING object: [%s]", typeid(*this).name()); \
+    \
+    if (!this->ok()) \
+        this->dump(); \
 }
 
-constexpr size_t operator "" _crs_hash(const char* str, std::size_t str_len)
+
+#define CRS_DESTRUCT_CHECK() \
+{ \
+    if (!this->ok()) \
+        this->dump(); \
+    \
+    CRS_STATIC_LOG("DESTRUCTING object: [%s]", typeid(*this).name()); \
+}
+
+#define CRS_BEG_CHECK() \
+{ \
+    CRS_STATIC_LOG("BEGIN functon check: %s", __func__); \
+    \
+    if (!this->ok()) \
+        this->dump(); \
+}
+
+#define CRS_END_CHECK() \
+{ \
+    if (!this->ok()) \
+        this->dump(); \
+    \
+    CRS_STATIC_LOG("END functon check: %s", __func__); \
+}
+
+namespace course_stack {
+//
+//template<char first_byte, char... rest_bytes>
+//size_t crs_hash_helper()
+//{
+//    return (crs_hash_helper<rest_bytes...>()) ^
+//           (first_byte << (sizeof...(rest_bytes))%(sizeof(size_t)/sizeof(char))*sizeof(char));
+//}
+//
+//template<char first_byte>
+//size_t crs_hash_helper()
+//{
+//    return first_byte;
+//}
+//
+//template<char... bytes>
+//size_t operator "" _crs_hash()
+//{
+//    return crs_hash_helper<bytes...>();
+//}
+
+constexpr size_t operator "" _crs_hash(const char* str)
 {
-    return crs_hash_helper(str, str_len);
+    size_t result = 0;
+
+    for (const char* it = str; *it; it++)
+    {
+        result ^= ((*it) << (it - str)%(sizeof(size_t)/sizeof(char))*sizeof(char));
+    }
+
+    return result;
 }
 
 class CLogger

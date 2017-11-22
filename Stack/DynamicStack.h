@@ -33,7 +33,7 @@ public:
 
 public:
     static const size_t MIN_CAPASITY = 2;
-    static const size_t CANARY_VALUE = 0xFF00FF00;//TODO: "CDynamicStack"_crs_hash;
+    static const size_t CANARY_VALUE = "CDynamicStack"_crs_hash;
 
 public:
     CDynamicStack():
