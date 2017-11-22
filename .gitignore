@@ -1,3 +1,14 @@
+# Code::Blocks .save files and others
+*.save
+*.layout
+*.bmarks
+*.html
+
+# Build directories
+[Bb]in/
+[Dd]ebug/
+[Rr]elease/
+
 # Compiled Object files
 *.slo
 *.lo
