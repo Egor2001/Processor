@@ -37,6 +37,7 @@
 			<Add option="-fexceptions" />
 		</Compiler>
 		<Unit filename="InputHandler.h" />
+		<Unit filename="Processor.h" />
 		<Unit filename="ProcessorEnums.h" />
 		<Unit filename="Stack/CourseException.h" />
 		<Unit filename="Stack/DynamicStack.h" />
@@ -46,6 +47,8 @@
 		<Unit filename="Stack/Stack.h" />
 		<Unit filename="Stack/UnitTest.h" />
 		<Unit filename="Translator.h" />
+		<Unit filename="TranslatorFiles/FileView.h" />
+		<Unit filename="TranslatorFiles/Mapping.h" />
 		<Unit filename="VirtualMachine.h" />
 		<Unit filename="main.cpp" />
 		<Extensions>

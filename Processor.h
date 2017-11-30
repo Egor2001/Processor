@@ -120,6 +120,8 @@ public:
 
         #undef HANDLE_MODE_
 
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
         CRS_IF_GUARD(CRS_END_CHECK();)
     }
 
@@ -152,6 +154,8 @@ public:
 
         #undef HANDLE_MODE_
 
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
         CRS_IF_GUARD(CRS_END_CHECK();)
     }
 
@@ -161,6 +165,8 @@ public:
             CRS_IF_GUARD(CRS_BEG_CHECK();) \
             \
             expression; \
+            \
+            CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();) \
             \
             CRS_IF_GUARD(CRS_END_CHECK();) \
         }
@@ -212,12 +218,15 @@ public:
 
     bool ok() const
     {
-        return this && proc_stack_.ok();
+        return (this && CRS_IF_CANARY_GUARD(beg_canary_ == CANARY_VALUE &&
+                                            end_canary_ == CANARY_VALUE &&)
+                CRS_IF_HASH_GUARD(hash_value_ == calc_hash_value_() &&)
+                proc_stack_.ok());
     }
 
     void dump() const
     {
-        CRS_STATIC_DUMP("CVirtualMachine[%s, this : %p] \n"
+        CRS_STATIC_DUMP("CProcessor[%s, this : %p] \n"
                         "{ \n"
                         CRS_IF_CANARY_GUARD("    beg_canary_[%s] : %#X \n")
                         CRS_IF_HASH_GUARD  ("    hash_value_[%s] : %#X \n")

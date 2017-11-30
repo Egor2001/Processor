@@ -3,18 +3,20 @@
 #define CRS_GUARD_LEVEL 3
 
 #include "Stack/Guard.h"
-
 #include "Processor.h"
-
 #include "Translator.h"
+#include "TranslatorFiles/FileView.h"
 
 using namespace course;
 
 int main()
 {
-    CTranslator translator;
+    CTranslator translator("asm/source");
 
-    translator.parse_string("fadd push ax hlt");
+    translator.parse_string("push ax \n push [bx + cx] \r\n fadd \n pop dx");
+
+    for (const auto& instr : translator.get_instruction_vec())
+        printf("%#x %#x %#x %#x \n", instr.command, instr.mode, instr.arg, instr.add);
 
     CProcessor proc;
 

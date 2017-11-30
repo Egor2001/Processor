@@ -202,7 +202,10 @@ public:
 
     bool ok() const
     {
-        return this && buffer_ && (size_ <= BUFFER_CAPASITY);
+        return (this && CRS_IF_CANARY_GUARD(beg_canary_ == CANARY_VALUE &&
+                                            end_canary_ == CANARY_VALUE &&)
+                CRS_IF_HASH_GUARD(hash_value_ == calc_hash_value_() &&)
+                buffer_ && (size_ <= BUFFER_CAPASITY));
     }
 
     void dump() const
