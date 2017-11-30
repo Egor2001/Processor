@@ -11,9 +11,9 @@ using namespace course;
 
 int main()
 {
-    CTranslator translator("asm/source");
+    CTranslator translator("asm/source.txt", "asm/executable.txt");
 
-    translator.parse_string("push ax \n push [bx + cx] \r\n fadd \n pop dx");
+    translator.parse_input();
 
     for (const auto& instr : translator.get_instruction_vec())
         printf("%#x %#x %#x %#x \n", instr.command, instr.mode, instr.arg, instr.add);

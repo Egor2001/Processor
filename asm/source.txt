@@ -1,3 +1,5 @@
 push 0.5
 push 7.5
-fadd
+fadd 
+hlt
+ 

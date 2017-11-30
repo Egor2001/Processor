@@ -11,6 +11,38 @@ namespace course {
 class CVirtualMachine
 {
 public:
+    static const size_t CANARY_VALUE = "CVirtualMachine"_crs_hash;
+
+public:
+    CVirtualMachine():
+        input_file_view_(),
+        instruction_vec_(),
+        processor_      ()
+    {
+
+    }
+
+private:
+    CRS_IF_HASH_GUARD(
+    size_t calc_hash_value_() const
+    {
+        size_t result = 0;
+
+        for (const auto& instruction : instruction_vec_)
+        {
+            result ^= (instruction.command ^
+                       (instruction.mode << 1*sizeof(UWord)/4) ^
+                       (instruction.mode << 2*sizeof(UWord)/4) ^
+                       (instruction.mode << 3*sizeof(UWord)/4));
+        }
+
+        result ^= static_cast<uintptr_t>(input_file_view_);
+
+        return result;
+    }
+    )//CRS_IF_HASH_GUARD
+
+public:
     void parse_instruction()
     {
         char command_str[16] = "";
@@ -117,25 +149,6 @@ public:
 
         return { CMD_HLT, {}, {}, {} };
     }
-private:
-    CRS_IF_HASH_GUARD(
-    size_t calc_hash_value_() const
-    {
-        size_t result = 0;
-
-        for (const auto& instruction : instruction_vec_)
-        {
-            result ^= (instruction.command ^
-                       (instruction.mode << 1*sizeof(UWord)/4) ^
-                       (instruction.mode << 2*sizeof(UWord)/4) ^
-                       (instruction.mode << 3*sizeof(UWord)/4));
-        }
-
-        result ^= static_cast<uintptr_t>(input_file_);
-
-        return result;
-    }
-    )//CRS_IF_HASH_GUARD
 
 public:
     void assert_ok() const
@@ -177,14 +190,11 @@ private:
     CRS_IF_CANARY_GUARD(size_t beg_canary_;)
     CRS_IF_HASH_GUARD  (size_t hash_value_;)
 
-    FILE* input_file_;
+    CFileView                 input_file_view_;
     std::vector<SInstruction> instruction_vec_;
+    CProcessor                processor_;
 
     CRS_IF_CANARY_GUARD(size_t end_canary_;)
-
-
-private:
-    CProcessor processor_;
 };
 
 }//namespace course

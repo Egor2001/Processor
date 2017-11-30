@@ -48,20 +48,21 @@ private:
     static const size_t CANARY_VALUE = "CTranslator"_crs_hash;
 
 public:
-    explicit CTranslator(const char* input_file_name):
+    explicit CTranslator(const char* input_file_name, const char* output_file_name):
         CRS_IF_CANARY_GUARD(beg_canary_(CANARY_VALUE),)
         CRS_IF_HASH_GUARD  (hash_value_(0),)
 
-        //input_file_view_ (ECMapMode::MAP_READONLY_FILE, input_file_name),
-        //output_file_view_(ECMapMode::MAP_READONLY_FILE, "asm/executable"),
+        input_file_view_ (ECMapMode::MAP_READONLY_FILE, input_file_name),
+        output_file_view_(ECMapMode::MAP_READONLY_FILE, output_file_name),
 
-        cur_pos_        (nullptr),
+        cur_in_pos_     (nullptr),
+        cur_out_pos_    (nullptr),
         instruction_vec_()
 
         CRS_IF_CANARY_GUARD(, end_canary_(CANARY_VALUE))
     {
-        //cur_pos_ = input_file_view_.get_file_view_str();
-        cur_pos_ = nullptr;
+        cur_in_pos_  = input_file_view_ .get_file_view_str();
+        cur_out_pos_ = output_file_view_.get_file_view_str();
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
@@ -79,14 +80,14 @@ public:
         CRS_IF_HASH_GUARD  (hash_value_ = 0;)
 
         instruction_vec_.clear();
-        cur_pos_ = nullptr;
+        cur_in_pos_ = nullptr;
     }
 
 private:
     CRS_IF_HASH_GUARD(
     size_t calc_hash_value_() const
     {
-        size_t result = reinterpret_cast<uintptr_t>(cur_pos_) ^ (instruction_vec_.size() << 0x8);
+        size_t result = reinterpret_cast<uintptr_t>(cur_in_pos_) ^ (instruction_vec_.size() << 0x8);
         CRS_IF_CANARY_GUARD(result ^= (beg_canary_ ^ end_canary_));
 
         for (const auto& instruction : instruction_vec_)
@@ -101,32 +102,30 @@ private:
 public:
     const std::vector<SInstruction>& get_instruction_vec() const { return instruction_vec_; }
 
-    void parse_string(const char* str)
+    void parse_input()
     {
         CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-        cur_pos_ = str;
-
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
-        while (*cur_pos_)
+        while (*cur_in_pos_)
         {
             instruction_vec_.push_back(parse_instruction());
 
             CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
-            if (*cur_pos_ == '\n' || *cur_pos_ == '\r')
+            if (*cur_in_pos_ == '\n' || *cur_in_pos_ == '\r')
             {
-                while (std::isspace(*cur_pos_))
-                    cur_pos_++;
+                while (std::isspace(*cur_in_pos_))
+                    cur_in_pos_++;
             }
-            else if (*cur_pos_ == '\0') break;
-            else CRS_PROCESS_ERROR("get_instruction: '\\n' expected before \"%.16s\"", cur_pos_)
+            else if (*cur_in_pos_ == '\0') break;
+            else CRS_PROCESS_ERROR("get_instruction: '\\n' expected before \"%.16s\"", cur_in_pos_)
 
             CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
         }
 
-        cur_pos_ = nullptr;
+        cur_in_pos_ = nullptr;
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
@@ -138,23 +137,26 @@ public:
         CRS_IF_GUARD(CRS_BEG_CHECK();)
 
         SInstruction result = {};
-        //sizeof(command_literal) because of +1 at ' ' and -1 at '\0'
+
         #define HANDLE_SIMPLE_CMD_(command_literal, command) \
-            else if (!strncmp(cur_pos_, command_literal " ", sizeof(command_literal))) \
+            else if (!strncmp(cur_in_pos_, command_literal, sizeof(command_literal)-1) && \
+                     !std::isalnum(cur_in_pos_[sizeof(command_literal)-1])) \
             { \
-                shift_and_pass_spaces_(sizeof(command_literal)); \
+                shift_and_pass_spaces_(sizeof(command_literal)-1); \
                 \
                 result = { command, {}, {}, {} }; \
             }
 
-        if (!strncmp(cur_pos_, "push"" ", sizeof("push")))
+        if (!strncmp(cur_in_pos_, "push", sizeof("push")-1) &&
+            !std::isalnum(cur_in_pos_[sizeof("push")-1]))
         {
-            shift_and_pass_spaces_(sizeof("push"));//this size because of +1 at ' ' and -1 at '\0'
+            shift_and_pass_spaces_(sizeof("push")-1);
             result = parse_push_();
         }
-        else if (!strncmp(cur_pos_, "pop"" ", sizeof("pop")))
+        else if (!strncmp(cur_in_pos_, "pop", sizeof("pop")-1) &&
+                 !std::isalnum(cur_in_pos_[sizeof("pop")-1]))
         {
-            shift_and_pass_spaces_(sizeof("pop"));//this size because of +1 at ' ' and -1 at '\0'
+            shift_and_pass_spaces_(sizeof("pop")-1);
             result = parse_pop_();
         }
 
@@ -175,7 +177,7 @@ public:
         HANDLE_SIMPLE_CMD_("ok",   CMD_OK)
         HANDLE_SIMPLE_CMD_("dump", CMD_DUMP)
 
-        else CRS_PROCESS_ERROR("handle input error: unrecognizable command: \"%.16s\"", cur_pos_)
+        else CRS_PROCESS_ERROR("handle input error: unrecognizable command: \"%.16s\"", cur_in_pos_)
 
         #undef HANDLE_CMD_
 
@@ -191,10 +193,10 @@ private:
     {
         CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-        cur_pos_ += shift;
+        cur_in_pos_ += shift;
 
-        while (*cur_pos_ == ' ' || *cur_pos_ == '\t')
-            cur_pos_++;
+        while (*cur_in_pos_ == ' ' || *cur_in_pos_ == '\t')
+            cur_in_pos_++;
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
@@ -207,16 +209,16 @@ private:
 
         UWord result_word = {};
 
-        sscanf(cur_pos_, "%f", &result_word);
+        sscanf(cur_in_pos_, "%f", &result_word);
 
-        while (std::isdigit(*cur_pos_))
-            cur_pos_++;
+        while (std::isdigit(*cur_in_pos_))
+            cur_in_pos_++;
 
-        if (*cur_pos_ == '.')
+        if (*cur_in_pos_ == '.')
         {
-            cur_pos_++;
-            while (std::isdigit(*cur_pos_))
-                cur_pos_++;
+            cur_in_pos_++;
+            while (std::isdigit(*cur_in_pos_))
+                cur_in_pos_++;
         }
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
@@ -232,10 +234,10 @@ private:
 
         UWord result_word = {};
 
-        sscanf(cur_pos_, "%d", &result_word);
+        sscanf(cur_in_pos_, "%d", &result_word);
 
-        while (std::isdigit(*cur_pos_))
-            cur_pos_++;
+        while (std::isdigit(*cur_in_pos_))
+            cur_in_pos_++;
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
@@ -251,7 +253,7 @@ private:
         SToken result = {};
 
         #define CHECK_REG_NAME(register, register_literal) \
-            if (!strncmp(cur_pos_, register_literal, sizeof(register_literal)-1)) \
+            if (!strncmp(cur_in_pos_, register_literal, sizeof(register_literal)-1)) \
             { \
                 shift_and_pass_spaces_(sizeof(register_literal)-1); \
                 \
@@ -263,7 +265,7 @@ private:
         else CHECK_REG_NAME(ERegister::REG_CX, "cx")
         else CHECK_REG_NAME(ERegister::REG_DX, "dx")
 
-        else CRS_PROCESS_ERROR("get_reg: unrecognizable register name \"%.16s\"", cur_pos_)
+        else CRS_PROCESS_ERROR("get_reg: unrecognizable register name \"%.16s\"", cur_in_pos_)
 
         #undef CHECK_REG_NAME
 
@@ -272,22 +274,22 @@ private:
         return result;
     }
 
-    parse_label_()
-    {
-        CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-        const size_t MAX_LABEL_NAME_LEN = 64;
-
-        char label_name[MAX_LABEL_NAME_LEN] = "";
-        size_t label_name_len = 0;
-
-        while (std::isalnum(*cur_pos_))
-            label_name_len++;
-
-        if (std::isalpha(*cur_pos_))
-
-        CRS_IF_GUARD(CRS_END_CHECK();)
-    }
+//    parse_label_()
+//    {
+//        CRS_IF_GUARD(CRS_BEG_CHECK();)
+//
+//        const size_t MAX_LABEL_NAME_LEN = 64;
+//
+//        char label_name[MAX_LABEL_NAME_LEN] = "";
+//        size_t label_name_len = 0;
+//
+//        while (std::isalnum(*cur_pos_))
+//            label_name_len++;
+//
+//        if (std::isalpha(*cur_pos_))
+//
+//        CRS_IF_GUARD(CRS_END_CHECK();)
+//    }
 
     SToken parse_reg_or_num_()
     {
@@ -295,9 +297,9 @@ private:
 
         SToken result = {};
 
-        if      (std::isdigit(*cur_pos_) || *cur_pos_ == '.') result = parse_num_();
-        else if (std::isalpha(*cur_pos_))                     result = parse_reg_();
-        else CRS_PROCESS_ERROR("get_reg_or_num: invalid argument: \"%.16s\"", cur_pos_)
+        if      (std::isdigit(*cur_in_pos_) || *cur_in_pos_ == '.') result = parse_num_();
+        else if (std::isalpha(*cur_in_pos_))                     result = parse_reg_();
+        else CRS_PROCESS_ERROR("get_reg_or_num: invalid argument: \"%.16s\"", cur_in_pos_)
 
         CRS_IF_GUARD(CRS_END_CHECK();)
 
@@ -310,9 +312,9 @@ private:
 
         SToken result = {};
 
-        if      (std::isdigit(*cur_pos_)) result = parse_idx_();
-        else if (std::isalpha(*cur_pos_)) result = parse_reg_();
-        else CRS_PROCESS_ERROR("get_reg_or_idx: invalid argument: \"%.16s\"", cur_pos_)
+        if      (std::isdigit(*cur_in_pos_)) result = parse_idx_();
+        else if (std::isalpha(*cur_in_pos_)) result = parse_reg_();
+        else CRS_PROCESS_ERROR("get_reg_or_idx: invalid argument: \"%.16s\"", cur_in_pos_)
 
         CRS_IF_GUARD(CRS_END_CHECK();)
 
@@ -325,19 +327,19 @@ private:
 
         SCommandArgs result = {};
 
-        if (*cur_pos_ == '[') shift_and_pass_spaces_();
-        else CRS_PROCESS_ERROR("get_bracket: '[' expected: '\"%.16s\"'", cur_pos_)
+        if (*cur_in_pos_ == '[') shift_and_pass_spaces_();
+        else CRS_PROCESS_ERROR("get_bracket: '[' expected: '\"%.16s\"'", cur_in_pos_)
 
         result.arg = parse_reg_or_idx_();
 
-        if (*cur_pos_ == '+')
+        if (*cur_in_pos_ == '+')
         {
             shift_and_pass_spaces_();
             result.add = parse_reg_or_idx_();
         }
 
-        if (*cur_pos_ == ']') shift_and_pass_spaces_();
-        else CRS_PROCESS_ERROR("get_bracket: ']' expected: '\"%.16s\"'", cur_pos_)
+        if (*cur_in_pos_ == ']') shift_and_pass_spaces_();
+        else CRS_PROCESS_ERROR("get_bracket: ']' expected: '\"%.16s\"'", cur_in_pos_)
 
         CRS_IF_GUARD(CRS_END_CHECK();)
 
@@ -351,7 +353,7 @@ private:
         SCommandArgs args = {};
         SInstruction result = { ECommand::CMD_PUSH, {}, {}, {} };
 
-        if (*cur_pos_ == '[')
+        if (*cur_in_pos_ == '[')
         {
             args = parse_bracket_();
 
@@ -368,7 +370,7 @@ private:
                                    "arg tok_type: %d, add tok_type: %d",
                                    args.arg.tok_type, args.add.tok_type)
         }
-        else if (std::isdigit(*cur_pos_) || std::isalpha(*cur_pos_) || *cur_pos_ == '.')
+        else if (std::isdigit(*cur_in_pos_) || std::isalpha(*cur_in_pos_) || *cur_in_pos_ == '.')
         {
             args.arg = parse_reg_or_num_();
 
@@ -379,7 +381,7 @@ private:
                                    "arg tok_type: %d, add tok_type: %d",
                                    args.arg.tok_type, args.add.tok_type)
         }
-        else CRS_PROCESS_ERROR("get_push: invalid empty argument list: \"%.16s\"", cur_pos_)
+        else CRS_PROCESS_ERROR("get_push: invalid empty argument list: \"%.16s\"", cur_in_pos_)
 
         result.arg = args.arg.tok_data;
         result.add = args.add.tok_data;
@@ -396,7 +398,7 @@ private:
         SCommandArgs args = {};
         SInstruction result = { ECommand::CMD_POP, {}, {}, {} };
 
-        if (*cur_pos_ == '[')
+        if (*cur_in_pos_ == '[')
         {
             args = parse_bracket_();
 
@@ -413,7 +415,7 @@ private:
                                    "arg tok_type: %d, add tok_type: %d",
                                    args.arg.tok_type, args.add.tok_type)
         }
-        else if (std::isdigit(*cur_pos_) || std::isalpha(*cur_pos_) || *cur_pos_ == '.')
+        else if (std::isdigit(*cur_in_pos_) || std::isalpha(*cur_in_pos_) || *cur_in_pos_ == '.')
         {
             args.arg = parse_reg_or_num_();
 
@@ -423,7 +425,7 @@ private:
                                    "arg tok_type: %d, add tok_type: %d",
                                    args.arg.tok_type, args.add.tok_type)
         }
-        else CRS_PROCESS_ERROR("get_pop: invalid empty argument list: \"%.16s\"", cur_pos_)
+        else CRS_PROCESS_ERROR("get_pop: invalid empty argument list: \"%.16s\"", cur_in_pos_)
 
         result.arg = args.arg.tok_data;
         result.add = args.add.tok_data;
@@ -466,7 +468,7 @@ public:
                         //input_file_view_ .get_file_view_size(),
                         //output_file_view_.get_file_view_size(),
 
-                        cur_pos_,
+                        cur_in_pos_,
                         instruction_vec_.size()
 
                         CRS_IF_CANARY_GUARD(, (end_canary_ == CANARY_VALUE ? "OK" : "ERROR"), end_canary_));
@@ -476,10 +478,11 @@ private:
     CRS_IF_CANARY_GUARD(size_t beg_canary_;)
     CRS_IF_HASH_GUARD  (size_t hash_value_;)
 
-    //CFileView input_file_view_;
-    //CFileView output_file_view_;
+    CFileView input_file_view_;
+    CFileView output_file_view_;
 
-    const char* cur_pos_;
+    const char* cur_in_pos_;
+    const char* cur_out_pos_;
     std::vector<SInstruction> instruction_vec_;
 
     CRS_IF_CANARY_GUARD(size_t end_canary_;)

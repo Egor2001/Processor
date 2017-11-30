@@ -10,7 +10,7 @@
 				<Option output="bin/Debug/Processor" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
-				<Option compiler="gnu_gcc_compiler_-_strict__fast_single_files_only" />
+				<Option compiler="gnu_gcc_compiler__strict" />
 				<Compiler>
 					<Add option="-std=c++0x" />
 					<Add option="-g" />
@@ -20,7 +20,7 @@
 				<Option output="bin/Release/Processor" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Release/" />
 				<Option type="1" />
-				<Option compiler="gnu_gcc_compiler_-_strict__fast_single_files_only" />
+				<Option compiler="gnu_gcc_compiler__strict" />
 				<Compiler>
 					<Add option="-O2" />
 					<Add option="-std=c++0x" />

@@ -31,7 +31,10 @@ public:
     CMapping& operator = (const CMapping&) = delete;
 
     CMapping(ECMapMode map_mode_set, const char* file_path, DWORD file_length_set = 0):
-        map_mode_(map_mode_set), map_handle_{NULL}, file_handle_{NULL}, file_length_(file_length_set)
+        map_mode_   (map_mode_set),
+        map_handle_ (INVALID_HANDLE_VALUE),
+        file_handle_(INVALID_HANDLE_VALUE),
+        file_length_(file_length_set)
     {
         switch (map_mode_)
         {
@@ -51,13 +54,9 @@ public:
             default: break;//TODO
         }
 
-        assert(file_handle_);
+        assert(file_handle_ != INVALID_HANDLE_VALUE);
 
-        if (!file_length_)
-        {
-            file_length_ = GetFileSize(file_handle_, &file_length_);
-            assert(file_length_);
-        }
+        if (!file_length_) file_length_ = GetFileSize(file_handle_, &file_length_);
 
         char mapping_name_str[16] = "";
         snprintf(mapping_name_str, 16, "%p", this);
@@ -78,7 +77,7 @@ public:
             default: assert(0);
         }
 
-        assert(map_handle_);
+        assert(map_handle_ != INVALID_HANDLE_VALUE);
     }
 
     ~CMapping()
