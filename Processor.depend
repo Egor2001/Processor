@@ -1,0 +1,83 @@
+# depslib dependency file v1.0
+1512920509 source:c:\users\егор\desktop\#school\#прога\processor\main.cpp
+	<cstdlib>
+	"Stack/Guard.h"
+	"Translator.h"
+	"TranslatorFiles/FileView.h"
+
+1511201627 c:\users\егор\desktop\#school\#прога\processor\virtualmachine.h
+	<climits>
+	<cmath>
+	"Stack/CourseException.h"
+	"Stack/Stack.h"
+	"Stack/Guard.h"
+	"ProcessorEnums.h"
+
+1512304139 c:\users\егор\desktop\#school\#прога\processor\stack\stack.h
+	<cstdlib>
+	"Logger.h"
+	"CourseException.h"
+	"Guard.h"
+
+1509969047 c:\users\егор\desktop\#school\#прога\processor\stack\logger.h
+	<memory>
+	<cstdio>
+	<limits>
+	<ctype.h>
+	<cmath>
+	<typeinfo>
+	<cstring>
+	"Macro.h"
+
+1509564424 c:\users\егор\desktop\#school\#прога\processor\stack\stackexception.h
+	<cstdlib>
+	<cstring>
+	<stdexcept>
+
+1509552734 c:\users\егор\desktop\#school\#прога\processor\stack\guard.h
+
+1509969559 c:\users\егор\desktop\#school\#прога\processor\stack\courseexception.h
+	<cstdlib>
+	<cstring>
+	<stdexcept>
+
+1513021594 c:\users\егор\desktop\#school\#прога\processor\stack\macro.h
+
+1512920553 c:\users\егор\desktop\#school\#прога\processor\processorenums.h
+
+1513022508 c:\users\егор\desktop\#school\#прога\processor\translator.h
+	<cstdio>
+	<vector>
+	<unordered_map>
+	<string>
+	<cstring>
+	<cctype>
+	"Stack/Logger.h"
+	"Stack/CourseException.h"
+	"Stack/Guard.h"
+	"ProcessorEnums.h"
+	"TranslatorFiles/FileView.h"
+	"RegistersList.h"
+	"CommandList.h"
+
+1512759124 c:\users\егор\desktop\#school\#прога\processor\processor.h
+	<vector>
+	<climits>
+	<cmath>
+	"Stack/CourseException.h"
+	"Stack/Stack.h"
+	"Stack/Guard.h"
+	"ProcessorEnums.h"
+
+1511977151 c:\users\егор\desktop\#school\#прога\processor\translatorfiles\fileview.h
+	<memory>
+	"Mapping.h"
+
+1512925096 c:\users\егор\desktop\#school\#прога\processor\translatorfiles\mapping.h
+	"windows.h"
+	<cassert>
+
+1512761926 c:\users\егор\desktop\#school\#прога\processor\registerslist.h
+
+1512924496 c:\users\егор\desktop\#school\#прога\processor\commandlist.h
+

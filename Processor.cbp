@@ -10,7 +10,7 @@
 				<Option output="bin/Debug/Processor" prefix_auto="1" extension_auto="1" />
 				<Option object_output="obj/Debug/" />
 				<Option type="1" />
-				<Option compiler="gnu_gcc_compiler__strict" />
+				<Option compiler="gnu_gcc_compiler_-_strict__fast_single_files_only" />
 				<Compiler>
 					<Add option="-std=c++0x" />
 					<Add option="-g" />
@@ -36,9 +36,11 @@
 			<Add option="-g" />
 			<Add option="-fexceptions" />
 		</Compiler>
+		<Unit filename="CommandList.h" />
 		<Unit filename="InputHandler.h" />
 		<Unit filename="Processor.h" />
 		<Unit filename="ProcessorEnums.h" />
+		<Unit filename="RegistersList.h" />
 		<Unit filename="Stack/CourseException.h" />
 		<Unit filename="Stack/DynamicStack.h" />
 		<Unit filename="Stack/Guard.h" />

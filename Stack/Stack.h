@@ -13,10 +13,12 @@
 
 namespace course_stack {
 
-template<typename ElemType, size_t BUFFER_CAPASITY>
+template<typename ElemType, size_t BufSize>
 class CStaticStack
 {
 public:
+    static const size_t BUFFER_CAPASITY = BufSize;
+
     typedef ElemType type_t_;
 
     typedef       type_t_&       reference_t_;

@@ -5,6 +5,16 @@ namespace course {
 
 const size_t REGISTERS_NUM = 4;
 
+union UWord
+{
+    UWord() { memset(this, 0xFF, sizeof(UWord)); }
+    UWord(uint32_t idx_set): idx(idx_set) {}
+    UWord(float    val_set): val(val_set) {}
+
+    uint32_t idx;
+    float    val;
+};
+
 enum ERegister
 {
     REG_AX = 0, REG_BX = 1, REG_CX = 2, REG_DX = 3
@@ -12,45 +22,40 @@ enum ERegister
 
 enum ECommand
 {
-    CMD_PUSH     = 0x1,
-    CMD_POP      = 0x2,
-    CMD_DUP      = 0x3,
-
-    CMD_FADD  = 0x4,
-    CMD_FSUB  = 0x5,
-    CMD_FMUL  = 0x6,
-    CMD_FDIV  = 0x7,
-
-    CMD_FSIN  = 0x8,
-    CMD_FCOS  = 0x9,
-    CMD_FSQRT = 0xA,
-
-    CMD_HLT = 0xB,
+    CMD_HLT = 0x0, //halt operation (default = 0x0)
+    CMD_PUSH, CMD_POP, CMD_DUP, //stack operations
+    CMD_JMP, CMD_JZ, CMD_JNZ, CMD_JE, CMD_JNE, CMD_JG, CMD_JGE, CMD_JL, CMD_JLE, //jumps
+    CMD_FADD, CMD_FSUB, CMD_FMUL, CMD_FDIV, CMD_FSIN, CMD_FCOS, CMD_FSQRT, //floating point arithm
 
     //are used in input handler
-    CMD_IN   = 0x10,
-    CMD_OUT  = 0x11,
-    CMD_OK   = 0x12,
-    CMD_DUMP = 0x13
+    CMD_IN, CMD_OUT, CMD_OK, CMD_DUMP
 };
 
 enum EPushMode
 {
-    PUSH_NUM         = 0x0,
-    PUSH_REG         = 0x1,
-    PUSH_RAM         = 0x2,
-    PUSH_RAM_REG     = 0x4,
-    PUSH_RAM_REG_NUM = 0x8,
-    PUSH_RAM_REG_REG = 0x10
+    PUSH_NUM,
+    PUSH_REG,
+    PUSH_RAM,
+    PUSH_RAM_REG,
+    PUSH_RAM_REG_NUM,
+    PUSH_RAM_REG_REG
 };
 
 enum EPopMode
 {
-    POP_REG         = 0x1,
-    POP_RAM         = 0x2,
-    POP_RAM_REG     = 0x4,
-    POP_RAM_REG_NUM = 0x8,
-    POP_RAM_REG_REG = 0x10
+    POP_REG,
+    POP_RAM,
+    POP_RAM_REG,
+    POP_RAM_REG_NUM,
+    POP_RAM_REG_REG
+};
+
+enum EJumpMode
+{
+    JUMP_REL,
+    JUMP_ABS,
+    JUMP_REG,
+    JUMP_RAM_REG
 };
 
 } //namespace course

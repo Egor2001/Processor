@@ -16,7 +16,8 @@ class CMapping
 public:
     static DWORD get_granularity_()
     {
-        SYSTEM_INFO sys_info = {};
+        SYSTEM_INFO sys_info;
+        memset(&sys_info, 0x00, sizeof(sys_info));
 
         GetSystemInfo(&sys_info);
 
@@ -95,8 +96,8 @@ public:
         }
     }
 
-    ECMapMode    get_map_mode  () const { return map_mode_; }
-    const HANDLE get_map_handle() const { return map_handle_; }
+    ECMapMode get_map_mode  () const { return map_mode_; }
+    HANDLE    get_map_handle() const { return map_handle_; }
 
     DWORD get_file_length() const { return file_length_; }
 

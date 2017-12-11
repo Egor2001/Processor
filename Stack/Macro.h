@@ -56,7 +56,7 @@
 
 #define CRS_BEG_CHECK() \
 { \
-    CRS_STATIC_LOG("BEGIN functon check: %s", __func__); \
+    CRS_STATIC_LOG("BEG functon check: %s", __func__); \
     \
     if (!this->ok()) \
         this->dump(); \
@@ -79,6 +79,12 @@
     CRS_STATIC_LOG("%s", error_str); \
     \
     throw CCourseException(error_str); \
+}
+
+#define CRS_CHECK_MEM_OPER(mem_oper_expr) \
+{ \
+    if (!(mem_oper_expr)) \
+        CRS_PROCESS_ERROR("CRS_CHECK_MEM_OPER failed on expression: [" CRS_STRINGIZE(mem_oper_expr) "]", 0) \
 }
 
 #endif // MACRO_H_INCLUDED
