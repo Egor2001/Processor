@@ -1,7 +1,8 @@
 # depslib dependency file v1.0
-1512920509 source:c:\users\егор\desktop\#school\#прога\processor\main.cpp
+1513195548 source:c:\users\егор\desktop\#school\#прога\processor\main.cpp
 	<cstdlib>
 	"Stack/Guard.h"
+	"Processor.h"
 	"Translator.h"
 	"TranslatorFiles/FileView.h"
 
@@ -13,7 +14,7 @@
 	"Stack/Guard.h"
 	"ProcessorEnums.h"
 
-1512304139 c:\users\егор\desktop\#school\#прога\processor\stack\stack.h
+1513197070 c:\users\егор\desktop\#school\#прога\processor\stack\stack.h
 	<cstdlib>
 	"Logger.h"
 	"CourseException.h"
@@ -36,16 +37,16 @@
 
 1509552734 c:\users\егор\desktop\#school\#прога\processor\stack\guard.h
 
-1509969559 c:\users\егор\desktop\#school\#прога\processor\stack\courseexception.h
+1513185482 c:\users\егор\desktop\#school\#прога\processor\stack\courseexception.h
 	<cstdlib>
 	<cstring>
 	<stdexcept>
 
 1513021594 c:\users\егор\desktop\#school\#прога\processor\stack\macro.h
 
-1512920553 c:\users\егор\desktop\#school\#прога\processor\processorenums.h
+1513179051 c:\users\егор\desktop\#school\#прога\processor\processorenums.h
 
-1513022508 c:\users\егор\desktop\#school\#прога\processor\translator.h
+1513195900 c:\users\егор\desktop\#school\#прога\processor\translator.h
 	<cstdio>
 	<vector>
 	<unordered_map>
@@ -60,7 +61,7 @@
 	"RegistersList.h"
 	"CommandList.h"
 
-1512759124 c:\users\егор\desktop\#school\#прога\processor\processor.h
+1513199508 c:\users\егор\desktop\#school\#прога\processor\processor.h
 	<vector>
 	<climits>
 	<cmath>
@@ -68,6 +69,8 @@
 	"Stack/Stack.h"
 	"Stack/Guard.h"
 	"ProcessorEnums.h"
+	"TranslatorFiles/FileView.h"
+	"CommandList.h"
 
 1511977151 c:\users\егор\desktop\#school\#прога\processor\translatorfiles\fileview.h
 	<memory>
@@ -77,7 +80,7 @@
 	"windows.h"
 	<cassert>
 
-1512761926 c:\users\егор\desktop\#school\#прога\processor\registerslist.h
+1513052940 c:\users\егор\desktop\#school\#прога\processor\registerslist.h
 
-1512924496 c:\users\егор\desktop\#school\#прога\processor\commandlist.h
+1513053009 c:\users\егор\desktop\#school\#прога\processor\commandlist.h
 

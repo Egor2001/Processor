@@ -16,7 +16,7 @@ public:
     CCourseException(const char* what_str_set):
         std::exception(), what_str_{}
     {
-        const char prefix_str[] = "[stack error]: ";
+        const char prefix_str[] = "[course error]: ";
 
         strncat(what_str_, prefix_str, sizeof(prefix_str));
         strncat(what_str_, what_str_set, MAX_MSG_LEN - sizeof(prefix_str));

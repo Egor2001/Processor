@@ -217,7 +217,7 @@ public:
                         CRS_IF_CANARY_GUARD("    beg_canary_[%s] : %#X \n")
                         CRS_IF_HASH_GUARD  ("    hash_value_[%s] : %#X \n")
                         "    \n"
-                        "    BUFFER_CAPASITY : %d \n"
+                        //"    BUFFER_CAPASITY : %d \n"
                         "    size_           : %d \n"
                         "    buffer_         : %p \n"
                         "    \n"
@@ -228,7 +228,7 @@ public:
                         CRS_IF_CANARY_GUARD((beg_canary_ == CANARY_VALUE       ? "OK" : "ERROR"), beg_canary_,)
                         CRS_IF_HASH_GUARD  ((hash_value_ == calc_hash_value_() ? "OK" : "ERROR"), hash_value_,)
 
-                        BUFFER_CAPASITY,
+                        //BUFFER_CAPASITY,
                         size_,
                         buffer_
 

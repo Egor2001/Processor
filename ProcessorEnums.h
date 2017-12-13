@@ -53,8 +53,8 @@ enum EPopMode
 enum EJumpMode
 {
     JUMP_REL,
-    JUMP_ABS,
     JUMP_REG,
+    JUMP_RAM,
     JUMP_RAM_REG
 };
 

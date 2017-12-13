@@ -42,18 +42,24 @@ private:
     class CLabelContainer
     {
     public:
+        struct SLabelUsePos
+        {
+            uint32_t cmd_idx;
+            char*    arg_ptr;
+        };
+
         static const size_t MAX_LABEL_LEN = 64;
 
     public:
         CLabelContainer():
-            replace_byte_container_ (),
+            replace_container_      (),
             label_use_container_    (),
             label_declare_container_()
         {}
 
         ~CLabelContainer()
         {
-            replace_byte_container_.clear();
+            replace_container_.clear();
 
             label_use_container_    .clear();
             label_declare_container_.clear();
@@ -74,7 +80,7 @@ private:
             label_declare_container_.insert({label_name, label_position});
         }
 
-        uint32_t push_label_use(const std::string& label_name)
+        uint32_t push_label_use_name(const std::string& label_name)
         {
             if (label_name.size() >= MAX_LABEL_LEN)
                 CRS_PROCESS_ERROR("push_label_use: "
@@ -86,30 +92,33 @@ private:
             return label_use_container_.size() - 1;
         }
 
-        void push_replace_byte(char* replace_byte_ptr)
+        void push_label_use_pos(SLabelUsePos label_use_pos)
         {
-            replace_byte_container_.push_back(replace_byte_ptr);
+            replace_container_.push_back(label_use_pos);
         }
 
         void replace_bytes()
         {
-            for (char* byte_to_replace_ptr : replace_byte_container_)
+            for (SLabelUsePos& label_use_pos : replace_container_)
             {
                 uint32_t label_idx = 0;
-                memcpy(&label_idx, byte_to_replace_ptr, sizeof(uint32_t));
+                memcpy(&label_idx, label_use_pos.arg_ptr, sizeof(uint32_t));
 
                 auto label_pos_iter = label_declare_container_.find(label_use_container_[label_idx]);
 
                 if (label_pos_iter != label_declare_container_.end())
-                    memcpy(byte_to_replace_ptr, &(label_pos_iter->second), sizeof(label_pos_iter->second));
+                {
+                    int32_t rel_offset = label_pos_iter->second - label_use_pos.cmd_idx;//must be signed
+                    memcpy(label_use_pos.arg_ptr, &rel_offset, sizeof(rel_offset));
+                }
                 else CRS_PROCESS_ERROR("replace_bytes: "
                                        "error: undeclared label \"%.*s\" usage",
-                                       MAX_LABEL_LEN, label_use_container_[*byte_to_replace_ptr].c_str())
+                                       MAX_LABEL_LEN, label_use_container_[*label_use_pos.arg_ptr].c_str())
             }
         }
 
     private:
-        std::vector<char*>                        replace_byte_container_;
+        std::vector<SLabelUsePos>                 replace_container_;
         std::vector<std::string>                  label_use_container_;
         std::unordered_map<std::string, uint32_t> label_declare_container_;
     };
@@ -126,9 +135,10 @@ public:
         input_file_view_ (ECMapMode::MAP_READONLY_FILE,  input_file_name),
         output_file_view_(ECMapMode::MAP_WRITEONLY_FILE, output_file_name, 4*input_file_view_.get_file_view_size()),
 
-        cur_in_pos_     (nullptr),
-        cur_out_pos_    (nullptr),
+        cur_in_pos_ (nullptr),
+        cur_out_pos_(nullptr),
 
+        command_pos_container_(),
         label_container_()
 
         CRS_IF_CANARY_GUARD(, end_canary_(CANARY_VALUE))
@@ -152,6 +162,8 @@ public:
         CRS_IF_HASH_GUARD  (hash_value_ = 0;)
 
         cur_in_pos_ = nullptr;
+
+        command_pos_container_.clear();
     }
 
 private:
@@ -166,6 +178,9 @@ private:
 
         result ^= reinterpret_cast<uintptr_t>(cur_in_pos_) ^
                   reinterpret_cast<uintptr_t>(cur_out_pos_);
+
+        for (size_t i = 0; i < command_pos_container_.size(); i++)
+            result ^= (*command_pos_container_[i] << (i%sizeof(size_t)));
 
         return result;
     }
@@ -294,7 +309,7 @@ private:
                 while (isalnum(*temp_pos)) temp_pos++;
 
                 std::string label_name(cur_in_pos_, temp_pos - cur_in_pos_);
-                uint32_t label_index = label_container_.push_label_use(label_name);
+                uint32_t label_index = label_container_.push_label_use_name(label_name);
 
                 shift_and_pass_spaces_(temp_pos - cur_in_pos_);
 
@@ -354,13 +369,20 @@ private:
         {
             auto bracket_args = parse_bracket_();
 
-            if (bracket_args.first .tok_type != ETokenType::TOK_REG ||
-                bracket_args.second.tok_type != ETokenType::TOK_NONE)
+            arg = bracket_args.first;
+
+            switch (bracket_args.first.tok_type)
+            {
+                case ETokenType::TOK_IDX: mode = EJumpMode::JUMP_RAM;     break;
+                case ETokenType::TOK_REG: mode = EJumpMode::JUMP_RAM_REG; break;
+
+                default: CRS_PROCESS_ERROR("handle_jump_args_: invalid ram request argument: "
+                                           "tok_type: %#x", arg.tok_type)
+            }
+
+            if (bracket_args.second.tok_type != ETokenType::TOK_NONE)
                 CRS_PROCESS_ERROR("handle_jump_args_: invalid ram request argument: "
                                   "tok_type: %#x", arg.tok_type)
-
-            arg = bracket_args.first;
-            mode = EJumpMode::JUMP_RAM_REG;
         }
         else
         {
@@ -368,9 +390,9 @@ private:
 
             switch (arg.tok_type)
             {
-                case ETokenType::TOK_IDX: mode = EJumpMode::JUMP_REL; break;
+                case ETokenType::TOK_IDX:
+                case ETokenType::TOK_LBL: mode = EJumpMode::JUMP_REL; break;
                 case ETokenType::TOK_REG: mode = EJumpMode::JUMP_REG; break;
-                case ETokenType::TOK_LBL: mode = EJumpMode::JUMP_ABS; break;
 
                 default:
                     CRS_PROCESS_ERROR("handle_jump_args_: invalid argument tok_type: %#x", arg.tok_type)
@@ -382,7 +404,7 @@ private:
 
         if (arg.tok_type == ETokenType::TOK_LBL)
         {
-            label_container_.push_replace_byte(cur_out_pos_);
+            label_container_.push_label_use_pos({command_pos_container_.size()-1, cur_out_pos_});
             write_word_(arg.tok_data);
         }
         else
@@ -524,7 +546,7 @@ private:
         while (std::isspace(*temp_pos)) temp_pos++;
 
         std::string label_name(cur_in_pos_, temp_pos - cur_in_pos_);
-        label_container_.push_label_declare(label_name, cur_out_pos_ - output_file_view_.get_file_view_str());
+        label_container_.push_label_declare(label_name, command_pos_container_.size());
 
         if (*temp_pos == ':') temp_pos++;
         else CRS_PROCESS_ERROR("parse_label_: error: ':' missed after \"%.16s\"", label_name.c_str())
@@ -550,6 +572,10 @@ private:
                      !std::isalnum(cur_in_pos_[sizeof(CRS_STRINGIZE(name))-1])) \
             { \
                 CRS_STATIC_MSG("parse_command: " CRS_STRINGIZE(name) " command detected"); \
+                \
+                command_pos_container_.push_back(cur_out_pos_); \
+                CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();) \
+                \
                 write_word_(UWord(static_cast<uint32_t>(opcode))); \
                 shift_and_pass_spaces_(sizeof(CRS_STRINGIZE(name))-1); \
                 \
@@ -634,6 +660,8 @@ private:
 
     const char* cur_in_pos_;
     char*       cur_out_pos_;
+
+    std::vector<const char*> command_pos_container_;
 
     CLabelContainer label_container_;
 

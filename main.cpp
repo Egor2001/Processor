@@ -1,9 +1,9 @@
 #include <cstdlib>
 
-#define CRS_GUARD_LEVEL 0
+#define CRS_GUARD_LEVEL 3
 
 #include "Stack/Guard.h"
-//#include "Processor.h"
+#include "Processor.h"
 #include "Translator.h"
 #include "TranslatorFiles/FileView.h"
 
@@ -11,14 +11,18 @@ using namespace course;
 
 int main()
 {
-    CTranslator translator("asm/source.txt", "asm/executable.txt");
+    {
+        CTranslator translator("asm/source.txt", "asm/executable.txt");
 
-    translator.parse_input();
+        translator.parse_input();
+    }
 //
 //    for (const auto& instr : translator.get_instruction_vec())
 //        printf("%#x %#x %#x %#x \n", instr.command, instr.mode, instr.arg, instr.add);
 //
-//    CProcessor proc;
+    CProcessor proc("asm/executable.txt");
+    proc.execute();
+
 //
 //    float var = 1.0f;
 //

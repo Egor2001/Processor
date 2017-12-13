@@ -1,8 +1,15 @@
-       push 5.0
-       push 6.0
-       fadd
-       jnz label
-       pop [0]
-       push [0]
-label: hlt
+	push 5.0
+	dup
+	out
+	push 6.0
+label0: fadd
+	dup
+	out
+        jnz  label1
+        pop  [0]
+	jge  label0
+	jl   [0]
+        push [0]
+	jmp  label1
+label1: hlt
 
