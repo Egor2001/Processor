@@ -218,6 +218,8 @@ public:
 
         label_container_.replace_bytes();
 
+        write_word_(static_cast<uint32_t>(-1), );
+
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
         CRS_IF_GUARD(CRS_END_CHECK();)

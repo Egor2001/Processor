@@ -1,10 +1,12 @@
-	push 5.0
+	push 5.09
+	in
 	dup
 	out
-	push 6.0
+	push 9.05
 label0: fadd
 	dup
 	out
+	dump
         jnz  label1
         pop  [0]
 	jge  label0

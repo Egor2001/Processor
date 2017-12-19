@@ -85,6 +85,75 @@ private:
     )//CRS_IF_HASH_GUARD
 
 public:
+    uint32_t get_command_len_(const char* token_pos) const
+    {
+        CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+        uint32_t result = 0;
+
+        ECommand command = static_cast<ECommand>(get_word_(token_pos, 0).idx);
+
+        switch (command)
+        {
+            case ECommand::CMD_PUSH:
+            {
+                switch (static_cast<EPushMode>(get_word_(token_pos, 1).idx))
+                {
+                    case EPushMode::PUSH_NUM:
+                    case EPushMode::PUSH_REG:
+                    case EPushMode::PUSH_RAM:
+                    case EPushMode::PUSH_RAM_REG:
+                        result = 3;
+                        break;
+
+                    case EPushMode::PUSH_RAM_REG_NUM:
+                    case EPushMode::PUSH_RAM_REG_REG:
+                        result = 4;
+                        break;
+                }
+            }
+            break;
+
+            case ECommand::CMD_POP:
+            {
+                switch (static_cast<EPopMode>(get_word_(token_pos, 1).idx))
+                {
+                    case EPopMode::POP_REG:
+                    case EPopMode::POP_RAM:
+                    case EPopMode::POP_RAM_REG:
+                        result = 3;
+                        break;
+
+                    case EPopMode::POP_RAM_REG_NUM:
+                    case EPopMode::POP_RAM_REG_REG:
+                        result = 4;
+                        break;
+                }
+            }
+            break;
+
+            case ECommand::CMD_JMP:
+            case ECommand::CMD_JZ:
+            case ECommand::CMD_JNZ:
+            case ECommand::CMD_JE:
+            case ECommand::CMD_JNE:
+            case ECommand::CMD_JG:
+            case ECommand::CMD_JGE:
+            case ECommand::CMD_JL:
+            case ECommand::CMD_JLE:
+                result = 3;
+                break;
+
+            default:
+                result = 1;
+                break;
+        }
+
+        CRS_IF_GUARD(CRS_END_CHECK();)
+
+        return result;
+    }
+
     void load_commands()
     {
         CRS_IF_GUARD(CRS_BEG_CHECK();)
@@ -94,68 +163,14 @@ public:
         const char* cur_pos = input_file_view_.get_file_view_str();
         uint32_t    cur_cmd_len = 0;
 
-        while (cur_pos + cur_cmd_len < end_pos && *(cur_pos + cur_cmd_len))
+        while (cur_pos + cur_cmd_len < end_pos)
         {
             cur_pos += cur_cmd_len*sizeof(UWord);
+
             instruction_pipe_.push_back(cur_pos);
+            CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
-            ECommand cur_cmd = static_cast<ECommand>(get_word_(cur_pos, 0).idx);
-
-            switch (cur_cmd)
-            {
-                case ECommand::CMD_PUSH:
-                {
-                    switch (static_cast<EPushMode>(get_word_(cur_pos, 1).idx))
-                    {
-                        case EPushMode::PUSH_NUM:
-                        case EPushMode::PUSH_REG:
-                        case EPushMode::PUSH_RAM:
-                        case EPushMode::PUSH_RAM_REG:
-                            cur_cmd_len = 2;
-                            break;
-
-                        case EPushMode::PUSH_RAM_REG_NUM:
-                        case EPushMode::PUSH_RAM_REG_REG:
-                            cur_cmd_len = 3;
-                            break;
-                    }
-                }
-                break;
-
-                case ECommand::CMD_POP:
-                {
-                    switch (static_cast<EPopMode>(get_word_(cur_pos, 1).idx))
-                    {
-                        case EPopMode::POP_REG:
-                        case EPopMode::POP_RAM:
-                        case EPopMode::POP_RAM_REG:
-                            cur_cmd_len = 2;
-                            break;
-
-                        case EPopMode::POP_RAM_REG_NUM:
-                        case EPopMode::POP_RAM_REG_REG:
-                            cur_cmd_len = 3;
-                            break;
-                    }
-                }
-                break;
-
-                case ECommand::CMD_JMP:
-                case ECommand::CMD_JZ:
-                case ECommand::CMD_JNZ:
-                case ECommand::CMD_JE:
-                case ECommand::CMD_JNE:
-                case ECommand::CMD_JG:
-                case ECommand::CMD_JGE:
-                case ECommand::CMD_JL:
-                case ECommand::CMD_JLE:
-                    cur_cmd_len = 2;
-                    break;
-
-                default:
-                    cur_cmd_len = 1;
-                    break;
-            }
+            cur_cmd_len = get_command_len_(cur_pos);
         }
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
@@ -342,7 +357,9 @@ private:
         { \
             CRS_IF_GUARD(CRS_BEG_CHECK();) \
             \
-            bool is_jump = cond; \
+            bool is_jump = (cond); \
+            \
+            CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();) \
             \
             if (is_jump) jump_helper_(static_cast<EJumpMode>(get_word_(instruction_pipe_[program_counter_], 1).idx), \
                                                              get_word_(instruction_pipe_[program_counter_], 2).idx); \
@@ -399,7 +416,7 @@ private:
         UWord word_to_push = {};
 
         printf("enter value: ");
-        scanf ("%f", &word_to_push);
+        scanf ("%f", &word_to_push.val);
 
         proc_stack_.push(word_to_push);
 
@@ -414,7 +431,7 @@ private:
     {
         CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-        printf("stack top: %f \n", proc_stack_.pop());
+        printf("stack top: %f \n", proc_stack_.pop().val);
 
         program_counter_++;/*TODO:*/
 
@@ -455,7 +472,7 @@ public:
         return (this && CRS_IF_CANARY_GUARD(beg_canary_ == CANARY_VALUE &&
                                             end_canary_ == CANARY_VALUE &&)
                 CRS_IF_HASH_GUARD(hash_value_ == calc_hash_value_() &&) proc_stack_.ok() &&
-                (program_counter_ < instruction_pipe_.size() || instruction_pipe_.size() == 0));
+                (program_counter_ <= instruction_pipe_.size() || instruction_pipe_.size() == 0));
     }
 
     void dump() const
@@ -480,7 +497,7 @@ public:
                         "    instruction_pipe_ \n"
                         "        size() : %d \n"
                         "    \n"
-                        "    program_counter_[%s] : [%d] = %#x \n"
+                        "    program_counter_[%s] : %d \n"
                         "    \n"
                         CRS_IF_CANARY_GUARD("    end_canary_[%s] : %#X \n")
                         "} \n",
@@ -499,9 +516,8 @@ public:
                         //PROC_RAM_SIZE,
 
                         instruction_pipe_.size(),
-
-                        program_counter_, (program_counter_ < instruction_pipe_.size() ? "OK" : "ERROR: OUT_OF_RANGE"),
-                        (program_counter_ < instruction_pipe_.size() ? get_word_(instruction_pipe_[program_counter_], 0).idx : 0xFFFFFFFF)
+                        (program_counter_ < instruction_pipe_.size() ? "OK" : "OUT_OF_RANGE"),
+                        program_counter_
 
                         CRS_IF_CANARY_GUARD(, (end_canary_ == CANARY_VALUE ? "OK" : "ERROR"), end_canary_));
     }
