@@ -1,17 +1,29 @@
-	push 5.09
-	in
-	dup
-	out
-	push 9.05
-label0: fadd
-	dup
-	out
-	dump
-        jnz  label1
-        pop  [0]
-	jge  label0
-	jl   [0]
-        push [0]
-	jmp  label1
-label1: hlt
+in
+call Fib
+dump
+out
+hlt
 
+Fib: pop ax
+     push 0.0
+     push 1.0
+     push ax
+     call FibHelper
+     pop ax
+     pop [0]
+ret
+
+FibHelper: dup
+           jz FibHelperEnd
+           pop ax
+           dup
+           pop bx
+           fadd
+           pop cx
+           push bx
+           push cx
+           push 1.0
+           push ax
+           fsub
+           call FibHelper
+FibHelperEnd: ret

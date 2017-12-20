@@ -29,9 +29,10 @@ public:
         CRS_IF_CANARY_GUARD(beg_canary_(CANARY_VALUE),)
         CRS_IF_HASH_GUARD  (hash_value_(0),)
 
-        proc_stack_    (),
-        proc_registers_(),
-        proc_ram_      (),
+        proc_stack_     (),
+        proc_call_stack_(),
+        proc_registers_ (),
+        proc_ram_       (),
 
         input_file_view_(ECMapMode::MAP_READONLY_FILE, input_file_name),
 
@@ -55,7 +56,8 @@ public:
         CRS_IF_CANARY_GUARD(beg_canary_ = end_canary_ = 0;)
         CRS_IF_HASH_GUARD  (hash_value_ = 0;)
 
-        proc_stack_.clear();
+        proc_stack_     .clear();
+        proc_call_stack_.clear();
         CRS_CHECK_MEM_OPER(memset(proc_registers_, 0x00, PROC_REG_COUNT*sizeof(UWord)))
         CRS_CHECK_MEM_OPER(memset(proc_ram_,       0x00, PROC_RAM_SIZE *sizeof(UWord)))
 
@@ -67,7 +69,8 @@ private:
     CRS_IF_HASH_GUARD(
     size_t calc_hash_value_() const
     {
-        size_t result = proc_stack_.get_hash_value();
+        size_t result = proc_stack_     .get_hash_value() ^
+                        proc_call_stack_.get_hash_value();
 
         result ^= (CRS_IF_CANARY_GUARD((beg_canary_ ^ end_canary_) ^)
                    (proc_registers_[ERegister::REG_AX].idx << 0x8) ^
@@ -92,6 +95,9 @@ public:
         uint32_t result = 0;
 
         ECommand command = static_cast<ECommand>(get_word_(token_pos, 0).idx);
+
+        if (command == ECommand::CMD_NULL_TERMINATOR)
+            return 0;
 
         switch (command)
         {
@@ -132,6 +138,10 @@ public:
             }
             break;
 
+            case ECommand::CMD_CALL:
+                result = 3;
+                break;
+
             case ECommand::CMD_JMP:
             case ECommand::CMD_JZ:
             case ECommand::CMD_JNZ:
@@ -171,6 +181,9 @@ public:
             CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
             cur_cmd_len = get_command_len_(cur_pos);
+
+            if (cur_cmd_len == 0)
+                break;
         }
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
@@ -204,6 +217,8 @@ public:
                     CRS_PROCESS_ERROR("provessor error: unrecognisable command: %#x", command)
             }
         }
+
+        program_counter_ = instruction_pipe_.size();
 
         #undef HANDLE_COMMAND_
 
@@ -248,12 +263,12 @@ private:
                 break;
 
             default:
-                CRS_PROCESS_ERROR("provessor error: unrecognizable jump mode: %#x", mode)
+                CRS_PROCESS_ERROR("processor error: unrecognizable jump mode: %#x", mode)
                 return;
         }
 
         if (program_counter_ >= instruction_pipe_.size())
-            CRS_PROCESS_ERROR("provessor error: "
+            CRS_PROCESS_ERROR("processor error: "
                               "program counter is out of range after jump: \"%#x\"", program_counter_)
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
@@ -352,6 +367,64 @@ private:
         CRS_IF_GUARD(CRS_END_CHECK();)
     }
 
+    void cmd_call_()
+    {
+        CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+        proc_call_stack_.push(program_counter_ + 1);
+
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
+        ECallMode mode = static_cast<ECallMode>(get_word_(instruction_pipe_[program_counter_], 1).idx);
+        UWord arg = get_word_(instruction_pipe_[program_counter_], 2);
+
+        switch (mode)
+        {
+            case ECallMode::CALL_REL:
+                program_counter_ += static_cast<int32_t>(arg.idx);
+                break;
+
+            case ECallMode::CALL_REG:
+                program_counter_ = proc_registers_[arg.idx].idx;
+                break;
+
+            case ECallMode::CALL_RAM:
+                program_counter_ = proc_ram_[arg.idx].idx;
+                break;
+
+            case ECallMode::CALL_RAM_REG:
+                program_counter_ = proc_ram_[proc_registers_[arg.idx].idx].idx;
+                break;
+
+            default:
+                CRS_PROCESS_ERROR("processor error: unrecognizable call mode: %#x", mode)
+                return;
+        }
+
+        if (program_counter_ >= instruction_pipe_.size())
+            CRS_PROCESS_ERROR("processor error: "
+                              "program counter is out of range after call: \"%#x\"", program_counter_)
+
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
+        CRS_IF_GUARD(CRS_END_CHECK();)
+    }
+
+    void cmd_ret_()
+    {
+        CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+        program_counter_ = proc_call_stack_.pop();
+
+        if (program_counter_ >= instruction_pipe_.size())
+            CRS_PROCESS_ERROR("processor error: "
+                              "program counter is out of range after ret: \"%#x\"", program_counter_)
+
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
+        CRS_IF_GUARD(CRS_END_CHECK();)
+    }
+
     #define DECLARE_JUMP_(name, cond) \
         void cmd_##name##_() \
         { \
@@ -405,9 +478,19 @@ private:
     DECLARE_SIMPLE_COMMAND_(fsin,  proc_stack_.push(sinf (proc_stack_.pop().val)))
     DECLARE_SIMPLE_COMMAND_(fcos,  proc_stack_.push(cosf (proc_stack_.pop().val)))
     DECLARE_SIMPLE_COMMAND_(fsqrt, proc_stack_.push(sqrtf(proc_stack_.pop().val)))
-    DECLARE_SIMPLE_COMMAND_(hlt, program_counter_ = instruction_pipe_.size())
 
     #undef DECLARE_SIMPLE_COMMAND_
+
+    void cmd_hlt_()
+    {
+        CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+        program_counter_ = instruction_pipe_.size();/*TODO:*/
+
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
+        CRS_IF_GUARD(CRS_END_CHECK();)
+    }
 
     void cmd_in_()
     {
@@ -447,6 +530,8 @@ private:
         dump();
         program_counter_++;/*TODO:*/
 
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
         CRS_IF_GUARD(CRS_END_CHECK();)
     }
 
@@ -456,6 +541,8 @@ private:
 
         printf("stack %s \n", (ok() ? "is ok" : "is not ok"));
         program_counter_++;/*TODO:*/
+
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
         CRS_IF_GUARD(CRS_END_CHECK();)
     }
@@ -526,9 +613,10 @@ private:
     CRS_IF_CANARY_GUARD(size_t beg_canary_;)
     CRS_IF_HASH_GUARD  (size_t hash_value_;)
 
-    CStaticStack<UWord, 64> proc_stack_;
-    UWord                   proc_registers_[PROC_REG_COUNT];
-    UWord                   proc_ram_      [PROC_RAM_SIZE];
+    CStaticStack<UWord, 64>      proc_stack_;
+    CStaticStack<uint32_t, 1024> proc_call_stack_;
+    UWord                        proc_registers_[PROC_REG_COUNT];
+    UWord                        proc_ram_      [PROC_RAM_SIZE];
 
     CFileView input_file_view_;
 

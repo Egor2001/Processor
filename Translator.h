@@ -218,7 +218,7 @@ public:
 
         label_container_.replace_bytes();
 
-        write_word_(static_cast<uint32_t>(-1), );
+        write_word_(static_cast<uint32_t>(ECommand::CMD_NULL_TERMINATOR));
 
         CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
@@ -358,6 +358,65 @@ private:
         CRS_IF_GUARD(CRS_END_CHECK();)
 
         return result;
+    }
+
+    void parse_call_args_(const char pattern_str[MAX_PATTERN_STR_LEN])
+    {
+        CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+        SToken arg = {};
+        ECallMode mode = {};
+
+        if (*cur_in_pos_ == '[')
+        {
+            auto bracket_args = parse_bracket_();
+
+            arg = bracket_args.first;
+
+            switch (bracket_args.first.tok_type)
+            {
+                case ETokenType::TOK_IDX: mode = ECallMode::CALL_RAM;     break;
+                case ETokenType::TOK_REG: mode = ECallMode::CALL_RAM_REG; break;
+
+                default: CRS_PROCESS_ERROR("handle_call_args_: invalid ram request argument: "
+                                           "tok_type: %#x", arg.tok_type)
+            }
+
+            if (bracket_args.second.tok_type != ETokenType::TOK_NONE)
+                CRS_PROCESS_ERROR("handle_call_args_: invalid ram request argument: "
+                                  "tok_type: %#x", arg.tok_type)
+        }
+        else
+        {
+            arg = parse_token_();
+
+            switch (arg.tok_type)
+            {
+                case ETokenType::TOK_IDX:
+                case ETokenType::TOK_LBL: mode = ECallMode::CALL_REL; break;
+                case ETokenType::TOK_REG: mode = ECallMode::CALL_REG; break;
+
+                default:
+                    CRS_PROCESS_ERROR("handle_call_args_: invalid argument tok_type: %#x", arg.tok_type)
+                    break;
+            }
+        }
+
+        write_word_(UWord(static_cast<uint32_t>(mode)));
+
+        if (arg.tok_type == ETokenType::TOK_LBL)
+        {
+            label_container_.push_label_use_pos({command_pos_container_.size()-1, cur_out_pos_});
+            write_word_(arg.tok_data);
+        }
+        else
+        {
+            write_word_(arg.tok_data);
+        }
+
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
+        CRS_IF_GUARD(CRS_END_CHECK();)
     }
 
     void parse_jump_args_(const char pattern_str[MAX_PATTERN_STR_LEN])

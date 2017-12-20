@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#define CRS_GUARD_LEVEL 3
+#define CRS_GUARD_LEVEL 1
 
 #include "Stack/Guard.h"
 #include "Processor.h"
@@ -11,30 +11,16 @@ using namespace course;
 
 int main()
 {
+    //for calling destructor, closing mapped files
     {
         CTranslator translator("asm/source.txt", "asm/executable.txt");
-
         translator.parse_input();
     }
-//
-//    for (const auto& instr : translator.get_instruction_vec())
-//        printf("%#x %#x %#x %#x \n", instr.command, instr.mode, instr.arg, instr.add);
-//
-    CProcessor proc("asm/executable.txt");
-    proc.execute();
 
-//
-//    float var = 1.0f;
-//
-//    proc.cmd_push(EPushMode::PUSH_NUM, var);
-//
-//    var = 0.5f;
-//
-//    proc.cmd_push(EPushMode::PUSH_NUM, var);
-//    proc.cmd_fdiv();
-//    proc.cmd_pop(EPopMode::POP_REG, uint32_t(ERegister::REG_AX));
-//
-//    printf("%f ", proc.reg_out(ERegister::REG_AX));
+    {
+        CProcessor proc("asm/executable.txt");
+        proc.execute();
+    }
 
     return 0;
 }

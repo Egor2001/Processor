@@ -24,12 +24,23 @@ enum ECommand
 {
     CMD_HLT = 0x0, //halt operation (default = 0x0)
     CMD_PUSH, CMD_POP, CMD_DUP, //stack operations
+    CMD_CALL, CMD_RET,//procedure managment
     CMD_JMP, CMD_JZ, CMD_JNZ, CMD_JE, CMD_JNE, CMD_JG, CMD_JGE, CMD_JL, CMD_JLE, //jumps
     CMD_FADD, CMD_FSUB, CMD_FMUL, CMD_FDIV, CMD_FSIN, CMD_FCOS, CMD_FSQRT, //floating point arithm
 
     //are used in input handler
-    CMD_IN, CMD_OUT, CMD_OK, CMD_DUMP
+    CMD_IN, CMD_OUT, CMD_OK, CMD_DUMP,
+
+    //not a command, has the same function with '\0'
+    CMD_NULL_TERMINATOR = 0xFFFFFFFF
 };
+
+#define DECLARE_MODES_(prefix) \
+    prefix##_REG, \
+    prefix##_RAM, \
+    prefix##_RAM_REG, \
+    prefix##_RAM_REG_IDX, \
+    prefix##_RAM_REG_REG
 
 enum EPushMode
 {
@@ -48,6 +59,14 @@ enum EPopMode
     POP_RAM_REG,
     POP_RAM_REG_NUM,
     POP_RAM_REG_REG
+};
+
+enum ECallMode
+{
+    CALL_REL,
+    CALL_REG,
+    CALL_RAM,
+    CALL_RAM_REG
 };
 
 enum EJumpMode

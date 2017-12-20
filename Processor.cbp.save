@@ -22,7 +22,8 @@
 				<Option type="1" />
 				<Option compiler="gnu_gcc_compiler_-_strict__fast_single_files_only" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-fexpensive-optimizations" />
+					<Add option="-O3" />
 					<Add option="-std=c++0x" />
 				</Compiler>
 				<Linker>
@@ -38,6 +39,7 @@
 		</Compiler>
 		<Unit filename="CommandList.h" />
 		<Unit filename="InputHandler.h" />
+		<Unit filename="JumpList.h" />
 		<Unit filename="Processor.h" />
 		<Unit filename="ProcessorEnums.h" />
 		<Unit filename="RegistersList.h" />

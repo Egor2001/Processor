@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1513195548 source:c:\users\егор\desktop\#school\#прога\processor\main.cpp
+1513798182 source:c:\users\егор\desktop\#school\#прога\processor\main.cpp
 	<cstdlib>
 	"Stack/Guard.h"
 	"Processor.h"
@@ -44,9 +44,9 @@
 
 1513021594 c:\users\егор\desktop\#school\#прога\processor\stack\macro.h
 
-1513179051 c:\users\егор\desktop\#school\#прога\processor\processorenums.h
+1513793897 c:\users\егор\desktop\#school\#прога\processor\processorenums.h
 
-1513195900 c:\users\егор\desktop\#school\#прога\processor\translator.h
+1513794011 c:\users\егор\desktop\#school\#прога\processor\translator.h
 	<cstdio>
 	<vector>
 	<unordered_map>
@@ -61,7 +61,7 @@
 	"RegistersList.h"
 	"CommandList.h"
 
-1513699849 c:\users\егор\desktop\#school\#прога\processor\processor.h
+1513795787 c:\users\егор\desktop\#school\#прога\processor\processor.h
 	<vector>
 	<climits>
 	<cmath>
@@ -82,5 +82,5 @@
 
 1513052940 c:\users\егор\desktop\#school\#прога\processor\registerslist.h
 
-1513053009 c:\users\егор\desktop\#school\#прога\processor\commandlist.h
+1513795638 c:\users\егор\desktop\#school\#прога\processor\commandlist.h
 
