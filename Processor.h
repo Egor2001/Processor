@@ -479,6 +479,9 @@ private:
     DECLARE_SIMPLE_COMMAND_(fcos,  proc_stack_.push(cosf (proc_stack_.pop().val)))
     DECLARE_SIMPLE_COMMAND_(fsqrt, proc_stack_.push(sqrtf(proc_stack_.pop().val)))
 
+    DECLARE_SIMPLE_COMMAND_(ftoi, proc_stack_.push(static_cast<uint32_t>(proc_stack_.pop().val)))
+    DECLARE_SIMPLE_COMMAND_(itof, proc_stack_.push(static_cast<float>   (proc_stack_.pop().idx)))
+
     #undef DECLARE_SIMPLE_COMMAND_
 
     void cmd_hlt_()

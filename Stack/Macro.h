@@ -15,7 +15,11 @@
 
 #define CRS_IS_POISON_FLOAT(var) (std::isnan(var))
 
-#ifdef CRS_LOGSTAMP
+#ifdef CRS_NO_LOGGING
+    #define CRS_STATIC_MSG(message_literal)
+    #define CRS_STATIC_LOG(format_literal, ...)
+
+#elif (defined CRS_LOGSTAMP)
     #define CRS_STATIC_MSG(message_literal) \
         CLogger::instance()->print_str("[FILE: " __FILE__ ", LINE:" CRS_STRINGIZE(__LINE__) "] " \
                                        "[" message_literal "] \n")

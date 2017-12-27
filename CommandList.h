@@ -28,6 +28,9 @@ HANDLE_COMMAND_(ECommand::CMD_FSIN,  fsin,  NO_PARAM, "")
 HANDLE_COMMAND_(ECommand::CMD_FCOS,  fcos,  NO_PARAM, "")
 HANDLE_COMMAND_(ECommand::CMD_FSQRT, fsqrt, NO_PARAM, "")
 
+HANDLE_COMMAND_(ECommand::CMD_FTOI, ftoi, NO_PARAM, "")
+HANDLE_COMMAND_(ECommand::CMD_ITOF, itof, NO_PARAM, "")
+
 HANDLE_COMMAND_(ECommand::CMD_IN,   in,   NO_PARAM, "")
 HANDLE_COMMAND_(ECommand::CMD_OUT,  out,  NO_PARAM, "")
 HANDLE_COMMAND_(ECommand::CMD_OK,   ok,   NO_PARAM, "")

@@ -1,0 +1,33 @@
+in
+call Fib
+push [bx]
+out
+hlt
+
+Fib: push 0.0
+     pop [0]
+     push 1.0
+     pop [1]
+     push 0.0
+     ftoi
+     pop bx
+
+     loop: push [bx]
+           push [bx+1]
+           fadd
+           pop [bx+2]
+           
+           push 1.0
+           push bx
+           itof
+           fadd
+           ftoi
+           pop bx           
+
+           pop ax
+           push 1.0
+           push ax
+           fsub
+           dup
+           jnz loop
+ret

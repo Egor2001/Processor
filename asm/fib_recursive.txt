@@ -1,6 +1,5 @@
 in
 call Fib
-dump
 out
 hlt
 

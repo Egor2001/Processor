@@ -3,7 +3,7 @@
 
 #include <cstdio>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <string>
 #include <cstring>
 #include <cctype>
@@ -72,12 +72,19 @@ private:
                                   "error: name length is %d >= (%d == MAX_LABEL_LEN)",
                                   label_name.size(), MAX_LABEL_LEN)
 
-            if (label_declare_container_.count(label_name) != 0)
-                CRS_PROCESS_ERROR("push_label_declare: "
-                                  "error: label \"%.*s\" redeclaration",
-                                  MAX_LABEL_LEN, label_name.c_str())
+            auto pos_iter = label_declare_container_.find(label_name);
 
-            label_declare_container_.insert({label_name, label_position});
+            if (pos_iter == label_declare_container_.end())
+            {
+                label_declare_container_.insert({label_name, label_position});
+            }
+            else if (pos_iter->second == static_cast<uint32_t>(-1))
+            {
+                pos_iter->second = label_position;
+            }
+            else CRS_PROCESS_ERROR("push_label_declare: "
+                                   "error: label \"%.*s\" redeclaration",
+                                   MAX_LABEL_LEN, label_name.c_str())
         }
 
         uint32_t push_label_use_name(const std::string& label_name)
@@ -87,7 +94,20 @@ private:
                                   "error: name length is %d >= (%d == MAX_LABEL_LEN)",
                                   label_name.size(), MAX_LABEL_LEN)
 
-            label_use_container_.push_back(label_name);
+            auto pos_iter = label_declare_container_.find(label_name);
+
+            if (pos_iter == label_declare_container_.end())
+            {
+                 auto insert_result = label_declare_container_.insert({label_name, static_cast<uint32_t>(-1)});//TODO:
+                 pos_iter = insert_result.first;
+
+                 if (!insert_result.second)
+                     CRS_PROCESS_ERROR("push_label_use: "
+                                       "error: reinsertion of label \"%.*s\"",
+                                       MAX_LABEL_LEN, label_name.c_str())
+            }
+
+            label_use_container_.push_back(pos_iter);
 
             return label_use_container_.size() - 1;
         }
@@ -99,28 +119,32 @@ private:
 
         void replace_bytes()
         {
-            for (SLabelUsePos& label_use_pos : replace_container_)
+            for (const SLabelUsePos& label_use_pos : replace_container_)
             {
                 uint32_t label_idx = 0;
                 memcpy(&label_idx, label_use_pos.arg_ptr, sizeof(uint32_t));
 
-                auto label_pos_iter = label_declare_container_.find(label_use_container_[label_idx]);
+                if (label_idx >= label_use_container_.size())
+                    CRS_PROCESS_ERROR("replace_bytes: "
+                                       "error: label index %d is out of range", label_idx)
 
-                if (label_pos_iter != label_declare_container_.end())
+                uint32_t label_pos = label_use_container_[label_idx]->second;
+
+                if (label_pos != static_cast<uint32_t>(-1))
                 {
-                    int32_t rel_offset = label_pos_iter->second - label_use_pos.cmd_idx;//must be signed
+                    int32_t rel_offset = label_pos - label_use_pos.cmd_idx;//must be signed
                     memcpy(label_use_pos.arg_ptr, &rel_offset, sizeof(rel_offset));
                 }
                 else CRS_PROCESS_ERROR("replace_bytes: "
                                        "error: undeclared label \"%.*s\" usage",
-                                       MAX_LABEL_LEN, label_use_container_[*label_use_pos.arg_ptr].c_str())
+                                       MAX_LABEL_LEN, label_use_container_[label_idx]->first.c_str())
             }
         }
 
     private:
-        std::vector<SLabelUsePos>                 replace_container_;
-        std::vector<std::string>                  label_use_container_;
-        std::unordered_map<std::string, uint32_t> label_declare_container_;
+        std::vector<SLabelUsePos>                              replace_container_;
+        std::vector<std::map<std::string, uint32_t>::iterator> label_use_container_;
+        std::map<std::string, uint32_t>                        label_declare_container_;
     };
 
     static const size_t MAX_PATTERN_STR_LEN = 128;

@@ -1,0 +1,23 @@
+push 0.0
+push 1000000.0
+
+loop: pop ax
+      push 1.0
+      push ax
+      fsub
+      pop ax
+      call test
+      push ax
+      dup
+      jnz loop
+
+pop ax
+out
+      
+hlt
+
+test: push 1.0
+      fadd
+      ret
+     
+

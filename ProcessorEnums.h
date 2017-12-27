@@ -28,6 +28,8 @@ enum ECommand
     CMD_JMP, CMD_JZ, CMD_JNZ, CMD_JE, CMD_JNE, CMD_JG, CMD_JGE, CMD_JL, CMD_JLE, //jumps
     CMD_FADD, CMD_FSUB, CMD_FMUL, CMD_FDIV, CMD_FSIN, CMD_FCOS, CMD_FSQRT, //floating point arithm
 
+    CMD_FTOI, CMD_ITOF,//float <-> int conversion
+
     //are used in input handler
     CMD_IN, CMD_OUT, CMD_OK, CMD_DUMP,
 

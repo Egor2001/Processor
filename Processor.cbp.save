@@ -26,9 +26,6 @@
 					<Add option="-O3" />
 					<Add option="-std=c++0x" />
 				</Compiler>
-				<Linker>
-					<Add option="-s" />
-				</Linker>
 			</Target>
 		</Build>
 		<Compiler>
