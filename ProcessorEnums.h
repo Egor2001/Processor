@@ -26,6 +26,9 @@ enum ECommand
     CMD_PUSH, CMD_POP, CMD_DUP, //stack operations
     CMD_CALL, CMD_RET,//procedure managment
     CMD_JMP, CMD_JZ, CMD_JNZ, CMD_JE, CMD_JNE, CMD_JG, CMD_JGE, CMD_JL, CMD_JLE, //jumps
+  /*CMD_MOV, CMD_CMP, CMD_INC, CMD_DEC,
+    CMD_ADD, CMD_SUB, CMD_MUL, CMD_DIV, CMD_AND, CMD_OR, CMD_XOR,
+    CMD_FADD, CMD_FSUB, CMD_FMUL, CMD_FDIV, */
     CMD_FADD, CMD_FSUB, CMD_FMUL, CMD_FDIV, CMD_FSIN, CMD_FCOS, CMD_FSQRT, //floating point arithm
 
     CMD_FTOI, CMD_ITOF,//float <-> int conversion

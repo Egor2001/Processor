@@ -18,8 +18,8 @@ enum
 
 int main(int argc, char* argv[])
 {
-    const char* file_name = nullptr;
-
+    const char* file_name = "asm/test.txt";
+    /*
     printf("choose mode: \n"
            "tap 0 for recursive \n"
            "tap 1 for iterative \n",
@@ -43,6 +43,7 @@ int main(int argc, char* argv[])
             printf("error: invalid mode");
             return EXIT_FAILURE;
     }
+    */
 
     //for calling destructor, closing mapped files
     {
