@@ -1,8 +1,11 @@
 #ifndef MAPPING_H_INCLUDED
 #define MAPPING_H_INCLUDED
 
-#include "windows.h"
 #include <cassert>
+
+#if defined(__WIN32)
+
+#include "windows.h"
 
 namespace course {
 
@@ -13,7 +16,7 @@ enum class ECMapMode
 
 class CMapping
 {
-public:
+private:
     static DWORD get_granularity_()
     {
         SYSTEM_INFO sys_info;
@@ -112,5 +115,88 @@ private:
 DWORD CMapping::granularity = CMapping::get_granularity_();
 
 }//namespace course
+
+#else
+
+#include <errno.h>
+#include <unistd.h>
+#include <sys/user.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+namespace course {
+
+enum class ECMapMode
+{
+    MAP_READONLY_FILE, MAP_WRITEONLY_FILE, MAP_READWRITE_FILE
+};
+
+class CMapping
+{
+private:
+    static const size_t granularity = PAGE_SIZE;
+
+public:
+    CMapping             (const CMapping&) = delete;
+    CMapping& operator = (const CMapping&) = delete;
+
+    CMapping(ECMapMode map_mode_set, const char* file_path, size_t file_length_set = 0):
+            map_mode_   (map_mode_set),
+            file_handle_(-1),
+            file_length_(file_length_set)
+    {
+        switch (map_mode_)
+        {
+            case ECMapMode::MAP_READONLY_FILE:
+                file_handle_ = open(file_path, O_RDONLY);
+
+                break;
+
+            case ECMapMode::MAP_WRITEONLY_FILE:
+                file_handle_ = open(file_path, O_RDWR);
+
+                break;
+
+            case ECMapMode::MAP_READWRITE_FILE:
+                file_handle_ = open(file_path, O_RDWR);
+
+                break;
+
+            default: break;//TODO
+        }
+
+        assert(file_handle_ != -1);
+
+        struct stat file_stat = {};
+        fstat(file_handle_, &file_stat);
+
+        if (!file_length_)
+            file_length_ = file_stat.st_size;
+    }
+
+    ~CMapping()
+    {
+        if (file_handle_ != -1)
+        {
+            close(file_handle_);
+            file_handle_ = -1;
+        }
+    }
+
+    ECMapMode get_map_mode()    const { return map_mode_; }
+    size_t    get_file_length() const { return file_length_; }
+
+    int get_file_handle() const { return file_handle_; }
+
+private:
+    ECMapMode map_mode_;
+
+    int    file_handle_;
+    size_t file_length_;
+};
+
+}//namespace course
+
+#endif //defined(__WIN32)
 
 #endif //MAPPING_H_INCLUDED

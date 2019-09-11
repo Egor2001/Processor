@@ -13,13 +13,13 @@
 
 namespace course_stack {
 
-constexpr size_t crs_hash_helper(const char* str, std::size_t str_len)
+constexpr size_t crs_hash_helper(const char* str, std::size_t str_len) noexcept
 {
     return (str_len ? crs_hash_helper(str+1, str_len-1) ^
-                      (*str << str_len%(sizeof(size_t)/sizeof(char))) : 0);
+                      (static_cast<uint8_t>(*str) << str_len%(sizeof(size_t)/sizeof(char))) : 0);
 }
 
-constexpr size_t operator "" _crs_hash(const char* str, std::size_t str_len)
+constexpr size_t operator "" _crs_hash(const char* str, std::size_t str_len) noexcept
 {
     return crs_hash_helper(str, str_len);
 }
@@ -169,7 +169,7 @@ private:
     FILE*    log_file_;
 };
 
-std::shared_ptr<CLogger> CLogger::instance_ = std::make_shared<CLogger>("Stack/Logs/log.txt", CLogger::ELogMode::LOG_DEBUG);
+std::shared_ptr<CLogger> CLogger::instance_ = std::make_shared<CLogger>("../Stack/Logs/log.txt", CLogger::ELogMode::LOG_DEBUG);
 
 }
 

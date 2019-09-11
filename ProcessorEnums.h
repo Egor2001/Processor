@@ -3,11 +3,11 @@
 
 namespace course {
 
-const size_t REGISTERS_NUM = 4;
+const size_t REGISTERS_NUM = 8;
 
 union UWord
 {
-    UWord() { memset(this, 0xFF, sizeof(UWord)); }
+    UWord(): idx(static_cast<uint32_t>(-1)) {}
     UWord(uint32_t idx_set): idx(idx_set) {}
     UWord(float    val_set): val(val_set) {}
 
@@ -17,7 +17,8 @@ union UWord
 
 enum ERegister
 {
-    REG_AX = 0, REG_BX = 1, REG_CX = 2, REG_DX = 3
+    REG_AX = 0, REG_BX = 1, REG_CX = 2, REG_DX = 3,
+    REG_R0 = 4, REG_R1 = 5, REG_R2 = 6, REG_R3 = 7
 };
 
 enum ECommand
@@ -46,6 +47,8 @@ enum ECommand
     prefix##_RAM_REG, \
     prefix##_RAM_REG_IDX, \
     prefix##_RAM_REG_REG
+
+#undef DECLARE_MODES_
 
 enum EPushMode
 {

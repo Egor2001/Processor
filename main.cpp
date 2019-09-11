@@ -1,7 +1,7 @@
 #include <cstdlib>
 
-#define CRS_GUARD_LEVEL 0
-#define CRS_NO_LOGGING
+#define CRS_GUARD_LEVEL 3
+//#define CRS_NO_LOGGING
 
 #include "Stack/Guard.h"
 #include "Processor.h"
@@ -18,7 +18,7 @@ enum
 
 int main(int argc, char* argv[])
 {
-    const char* file_name = "asm/test.txt";
+    const char* file_name = "../asm/test.txt";
     /*
     printf("choose mode: \n"
            "tap 0 for recursive \n"
@@ -48,12 +48,12 @@ int main(int argc, char* argv[])
     //for calling destructor, closing mapped files
     {
 
-        CTranslator translator(file_name, "asm/executable.txt");
+        CTranslator translator(file_name, "../asm/executable.txt");
         translator.parse_input();
     }
 
     {
-        CProcessor proc("asm/executable.txt");
+        CProcessor proc("../asm/executable.txt");
         proc.execute();
     }
 

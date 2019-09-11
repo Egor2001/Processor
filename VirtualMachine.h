@@ -23,7 +23,6 @@ public:
     }
 
 private:
-    CRS_IF_HASH_GUARD(
     size_t calc_hash_value_() const
     {
         size_t result = 0;
@@ -40,7 +39,6 @@ private:
 
         return result;
     }
-    )//CRS_IF_HASH_GUARD
 
 public:
     void parse_instruction()
@@ -54,8 +52,6 @@ public:
                 CRS_STATIC_MSG(CRS_STRINGIZE(command) " command recognized"); \
                 return { command, {}, {}, {} }; \
                 break;
-
-        switch ()
 
         if (!strcmp(command_str, "push"))
         {
@@ -143,7 +139,6 @@ public:
 
         else
             CRS_PROCESS_ERROR("handle input error: unrecognizable command : %s", command_str)
-            return;
 
         #undef HANDLE_SIMPLE_CMD_
 
