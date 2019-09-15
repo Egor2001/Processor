@@ -124,6 +124,8 @@ DWORD CMapping::granularity = CMapping::get_granularity_();
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "../Stack/Logger.h"
+
 namespace course {
 
 enum class ECMapMode
@@ -148,30 +150,39 @@ public:
         switch (map_mode_)
         {
             case ECMapMode::MAP_READONLY_FILE:
+            {
                 file_handle_ = open(file_path, O_RDONLY);
 
-                break;
+                if (!file_length_)
+                {
+                    struct stat file_stat = {};
+                    fstat(file_handle_, &file_stat);
+
+                    file_length_ = file_stat.st_size;
+                }
+            }
+            break;
 
             case ECMapMode::MAP_WRITEONLY_FILE:
+            {
                 file_handle_ = open(file_path, O_RDWR);
 
-                break;
+                if (file_length_)
+                    ftruncate(file_handle_, file_length_);
+            }
+            break;
 
             case ECMapMode::MAP_READWRITE_FILE:
+            {
                 file_handle_ = open(file_path, O_RDWR);
 
-                break;
+                if (file_length_)
+                    ftruncate(file_handle_, file_length_);
+            }
+            break;
 
             default: break;//TODO
         }
-
-        assert(file_handle_ != -1);
-
-        struct stat file_stat = {};
-        fstat(file_handle_, &file_stat);
-
-        if (!file_length_)
-            file_length_ = file_stat.st_size;
     }
 
     ~CMapping()

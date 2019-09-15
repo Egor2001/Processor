@@ -5,20 +5,20 @@
 #include <climits>
 #include <cmath>
 
-#include "Stack/CourseException.h"
-#include "Stack/Stack.h"
+#include "../Stack/CourseException.h"
+#include "../Stack/Stack.h"
 
-#include "Stack/Guard.h"
+#include "../Stack/Guard.h"
 #include "ProcessorEnums.h"
 
-#include "TranslatorFiles/FileView.h"
+#include "../Translator/FileView.h"
 
 namespace course {
 
 using namespace course_stack;
 using course_stack::operator "" _crs_hash;
 
-class CProcessor
+class CProcessor final
 {
     static const size_t PROC_REG_COUNT = REGISTERS_NUM, PROC_RAM_SIZE = 0x1000;
 
@@ -81,23 +81,23 @@ private:
 
     DECLARE_SIMPLE_COMMAND_(dup, proc_stack_.push(proc_stack_.top()))
 
-    DECLARE_SIMPLE_COMMAND_(fadd, proc_stack_.push(proc_stack_.pop().val + proc_stack_.pop().val))
-    DECLARE_SIMPLE_COMMAND_(fsub, proc_stack_.push(proc_stack_.pop().val - proc_stack_.pop().val))
-    DECLARE_SIMPLE_COMMAND_(fmul, proc_stack_.push(proc_stack_.pop().val * proc_stack_.pop().val))
-    DECLARE_SIMPLE_COMMAND_(fdiv, proc_stack_.push(proc_stack_.pop().val / proc_stack_.pop().val))
+    DECLARE_SIMPLE_COMMAND_(fadd, proc_stack_.push(proc_stack_.pop().flt + proc_stack_.pop().flt))
+    DECLARE_SIMPLE_COMMAND_(fsub, proc_stack_.push(proc_stack_.pop().flt - proc_stack_.pop().flt))
+    DECLARE_SIMPLE_COMMAND_(fmul, proc_stack_.push(proc_stack_.pop().flt * proc_stack_.pop().flt))
+    DECLARE_SIMPLE_COMMAND_(fdiv, proc_stack_.push(proc_stack_.pop().flt / proc_stack_.pop().flt))
 
-    DECLARE_SIMPLE_COMMAND_(fsin,  proc_stack_.push(sinf (proc_stack_.pop().val)))
-    DECLARE_SIMPLE_COMMAND_(fcos,  proc_stack_.push(cosf (proc_stack_.pop().val)))
-    DECLARE_SIMPLE_COMMAND_(fsqrt, proc_stack_.push(sqrtf(proc_stack_.pop().val)))
+    DECLARE_SIMPLE_COMMAND_(fsin,  proc_stack_.push(sinf (proc_stack_.pop().flt)))
+    DECLARE_SIMPLE_COMMAND_(fcos,  proc_stack_.push(cosf (proc_stack_.pop().flt)))
+    DECLARE_SIMPLE_COMMAND_(fsqrt, proc_stack_.push(sqrtf(proc_stack_.pop().flt)))
 
-    DECLARE_SIMPLE_COMMAND_(ftoi, proc_stack_.push(static_cast<uint32_t>(proc_stack_.pop().val)))
+    DECLARE_SIMPLE_COMMAND_(ftoi, proc_stack_.push(static_cast<uint32_t>(proc_stack_.pop().flt)))
     DECLARE_SIMPLE_COMMAND_(itof, proc_stack_.push(static_cast<float>   (proc_stack_.pop().idx)))
 
 #undef DECLARE_SIMPLE_COMMAND_
 
 public:
-    bool ok() const;
-    void dump() const;
+    [[nodiscard]] bool ok() const noexcept;
+    void dump() const noexcept;
 
 private:
     CRS_IF_CANARY_GUARD(size_t beg_canary_;)
@@ -183,7 +183,7 @@ uint32_t CProcessor::get_command_len_(const char* token_pos) const
 
     ECommand command = static_cast<ECommand>(get_word_(token_pos, 0).idx);
 
-    if (command == ECommand::CMD_NULL_TERMINATOR)
+    if (command == ECommand::CMD_ERR_VALUE)
         return 0;
 
     switch (command)
@@ -197,15 +197,15 @@ uint32_t CProcessor::get_command_len_(const char* token_pos) const
                 case EPushMode::PUSH_RAM:
                 case EPushMode::PUSH_RAM_REG:
                     result = 3;
-                    break;
+                break;
 
                 case EPushMode::PUSH_RAM_REG_NUM:
                 case EPushMode::PUSH_RAM_REG_REG:
                     result = 4;
-                    break;
+                break;
             }
         }
-            break;
+        break;
 
         case ECommand::CMD_POP:
         {
@@ -215,19 +215,19 @@ uint32_t CProcessor::get_command_len_(const char* token_pos) const
                 case EPopMode::POP_RAM:
                 case EPopMode::POP_RAM_REG:
                     result = 3;
-                    break;
+                break;
 
                 case EPopMode::POP_RAM_REG_NUM:
                 case EPopMode::POP_RAM_REG_REG:
                     result = 4;
-                    break;
+                break;
             }
         }
-            break;
+        break;
 
         case ECommand::CMD_CALL:
             result = 3;
-            break;
+        break;
 
         case ECommand::CMD_JMP:
         case ECommand::CMD_JZ:
@@ -239,11 +239,11 @@ uint32_t CProcessor::get_command_len_(const char* token_pos) const
         case ECommand::CMD_JL:
         case ECommand::CMD_JLE:
             result = 3;
-            break;
+        break;
 
         default:
             result = 1;
-            break;
+        break;
     }
 
     CRS_IF_GUARD(CRS_END_CHECK();)
@@ -285,12 +285,6 @@ void CProcessor::execute()
     if (instruction_pipe_.empty())
         load_commands();
 
-    #define HANDLE_COMMAND_(opcode, name, parametered, pattern) \
-            case opcode: \
-            { \
-                cmd_##name##_(); \
-            } \
-            break;
 
     while (program_counter_ < instruction_pipe_.size())
     {
@@ -298,16 +292,24 @@ void CProcessor::execute()
 
         switch (command)
         {
-            #include "CommandList.h"
+        #define HANDLE_COMMAND_(enum_name, code, name, parametered, lhs, rhs) \
+            case ECommand:: enum_name: \
+            { \
+                cmd_##name##_(); \
+                CRS_STATIC_MSG("execute [detected command: ECommand::" CRS_STRINGIZE(enum_name) "]"); \
+            } \
+            break;
+
+            #include "../EnumLists/CommandList.h"
+
+        #undef HANDLE_COMMAND_
 
             default:
-            CRS_PROCESS_ERROR("processor error: unrecognisable command: %#x", command)
+                CRS_PROCESS_ERROR("processor error: unrecognisable command: %#x", command)
         }
     }
 
     program_counter_ = instruction_pipe_.size();
-
-    #undef HANDLE_COMMAND_
 
     CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
@@ -320,6 +322,7 @@ UWord CProcessor::get_word_(const char* cur_ptr, uint32_t word_num) const
 
     UWord result = {};
     memcpy(&result, cur_ptr + word_num*sizeof(UWord), sizeof(UWord));
+    CRS_STATIC_LOG("get word: %#X", result.idx);
 
     CRS_IF_GUARD(CRS_END_CHECK();)
 
@@ -529,7 +532,7 @@ void CProcessor::cmd_in_()
     UWord word_to_push = {};
 
     printf("enter value: ");
-    scanf ("%f", &word_to_push.val);
+    scanf ("%f", &word_to_push.flt);
 
     proc_stack_.push(word_to_push);
 
@@ -544,7 +547,7 @@ void CProcessor::cmd_out_()
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-    printf("stack top: %f \n", proc_stack_.pop().val);
+    printf("stack top: %f \n", proc_stack_.pop().flt);
 
     program_counter_++;/*TODO:*/
 
@@ -622,21 +625,21 @@ DECLARE_JUMP_(jle, proc_stack_.pop().idx <= proc_stack_.pop().idx)
 
 DECLARE_SIMPLE_COMMAND_(dup, proc_stack_.push(proc_stack_.top()))
 
-DECLARE_SIMPLE_COMMAND_(fadd, proc_stack_.push(proc_stack_.pop().val + proc_stack_.pop().val))
-DECLARE_SIMPLE_COMMAND_(fsub, proc_stack_.push(proc_stack_.pop().val - proc_stack_.pop().val))
-DECLARE_SIMPLE_COMMAND_(fmul, proc_stack_.push(proc_stack_.pop().val * proc_stack_.pop().val))
-DECLARE_SIMPLE_COMMAND_(fdiv, proc_stack_.push(proc_stack_.pop().val / proc_stack_.pop().val))
+DECLARE_SIMPLE_COMMAND_(fadd, proc_stack_.push(proc_stack_.pop().flt + proc_stack_.pop().flt))
+DECLARE_SIMPLE_COMMAND_(fsub, proc_stack_.push(proc_stack_.pop().flt - proc_stack_.pop().flt))
+DECLARE_SIMPLE_COMMAND_(fmul, proc_stack_.push(proc_stack_.pop().flt * proc_stack_.pop().flt))
+DECLARE_SIMPLE_COMMAND_(fdiv, proc_stack_.push(proc_stack_.pop().flt / proc_stack_.pop().flt))
 
-DECLARE_SIMPLE_COMMAND_(fsin,  proc_stack_.push(sinf (proc_stack_.pop().val)))
-DECLARE_SIMPLE_COMMAND_(fcos,  proc_stack_.push(cosf (proc_stack_.pop().val)))
-DECLARE_SIMPLE_COMMAND_(fsqrt, proc_stack_.push(sqrtf(proc_stack_.pop().val)))
+DECLARE_SIMPLE_COMMAND_(fsin,  proc_stack_.push(sinf (proc_stack_.pop().flt)))
+DECLARE_SIMPLE_COMMAND_(fcos,  proc_stack_.push(cosf (proc_stack_.pop().flt)))
+DECLARE_SIMPLE_COMMAND_(fsqrt, proc_stack_.push(sqrtf(proc_stack_.pop().flt)))
 
-DECLARE_SIMPLE_COMMAND_(ftoi, proc_stack_.push(static_cast<uint32_t>(proc_stack_.pop().val)))
+DECLARE_SIMPLE_COMMAND_(ftoi, proc_stack_.push(static_cast<uint32_t>(proc_stack_.pop().flt)))
 DECLARE_SIMPLE_COMMAND_(itof, proc_stack_.push(static_cast<float>   (proc_stack_.pop().idx)))
 
 #undef DECLARE_SIMPLE_COMMAND_
 
-bool CProcessor::ok() const
+bool CProcessor::ok() const noexcept
 {
     return (this && CRS_IF_CANARY_GUARD(beg_canary_ == CANARY_VALUE &&
                                         end_canary_ == CANARY_VALUE &&)
@@ -644,7 +647,7 @@ bool CProcessor::ok() const
             (program_counter_ <= instruction_pipe_.size() || instruction_pipe_.size() == 0));
 }
 
-void CProcessor::dump() const
+void CProcessor::dump() const noexcept
 {
     CRS_STATIC_DUMP("CProcessor[%s, this : %p] \n"
                     "{ \n"

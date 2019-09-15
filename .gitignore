@@ -1,8 +1,12 @@
+# Logs
+Logs/*.txt
+
 # Code::Blocks .save files and others
 *.save
 *.layout
 *.bmarks
 *.html
+*.cbp
 
 # Build directories
 [Bb]in/

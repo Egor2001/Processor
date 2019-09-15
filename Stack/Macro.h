@@ -40,7 +40,6 @@
 #define CRS_STATIC_DUMP(format_literal, ...) \
     CLogger::instance()->print_str(format_literal " \n", __VA_ARGS__)
 
-
 #define CRS_CONSTRUCT_CHECK() \
 { \
     CRS_STATIC_LOG("CONSTRUCTING object: [%s]", typeid(*this).name()); \
@@ -48,7 +47,6 @@
     if (!this->ok()) \
         this->dump(); \
 }
-
 
 #define CRS_DESTRUCT_CHECK() \
 { \
@@ -60,7 +58,7 @@
 
 #define CRS_BEG_CHECK() \
 { \
-    CRS_STATIC_LOG("BEG functon check: %s", __func__); \
+/*    CRS_STATIC_LOG("BEG functon check: %s", __func__);*/ \
     \
     if (!this->ok()) \
         this->dump(); \
@@ -71,7 +69,7 @@
     if (!this->ok()) \
         this->dump(); \
     \
-    CRS_STATIC_LOG("END functon check: %s", __func__); \
+/*    CRS_STATIC_LOG("END functon check: %s", __func__);*/ \
 }
 
 #define CRS_PROCESS_ERROR(format_str, ...) \

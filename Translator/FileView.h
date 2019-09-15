@@ -90,7 +90,7 @@ public:
 
         file_view_size_ = mapping_class_->get_file_length();
         file_view_str_  = static_cast<char*>(mmap(nullptr, file_view_size_, access,
-                                             MAP_PRIVATE, mapping_class_->get_file_handle(), 0));
+                                             MAP_SHARED, mapping_class_->get_file_handle(), 0));
 
         assert(file_view_str_ != MAP_FAILED);
         assert(file_view_str_);

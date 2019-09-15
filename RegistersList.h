@@ -1,8 +1,0 @@
-HANDLE_REGISTER_(ERegister::REG_AX, "ax")
-HANDLE_REGISTER_(ERegister::REG_BX, "bx")
-HANDLE_REGISTER_(ERegister::REG_CX, "cx")
-HANDLE_REGISTER_(ERegister::REG_DX, "dx")
-HANDLE_REGISTER_(ERegister::REG_R0, "r0")
-HANDLE_REGISTER_(ERegister::REG_R1, "r1")
-HANDLE_REGISTER_(ERegister::REG_R2, "r2")
-HANDLE_REGISTER_(ERegister::REG_R3, "r3")
