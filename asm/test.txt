@@ -1,28 +1,11 @@
-push 1500.0
-pop r1
-push 0.0
-pop r2
-push 1.0
-pop r3
-push 1.0
-dup
+in
 pop ax
-dup
-push 1.0
-dup
+call func
+push ax
 out
-out
-mark1: dup
-       pop bx
-       fadd
-       pop cx
-       push bx
-       push cx
-       push r1
-       push r2
-       push r3
-       fadd
-       dup
-       pop r2
-       jz mark1
 hlt
+
+func:
+    inc ax
+    ret
+

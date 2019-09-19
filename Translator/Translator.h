@@ -98,44 +98,21 @@ public:
 
 private:
     void shift_and_pass_spaces_(size_t shift = 1);
+
+    void write_args_(char* cmd_pos, ECommand cmd, EArgument lhs_arg, EArgument rhs_arg);
     void write_word_(UWord word);
 
-    SToken                    parse_token_();
-    ETokenType                parse_command_();
-    void                      parse_label_();
-    std::pair<SToken, SToken> parse_bracket_();
+    bool parse_cmd_(ECommand* cmd_ptr);
+    bool parse_lbl_();
 
-    bool parse_cmd(ECommand* cmd_ptr);
-
-    bool parse_all_arg();
-    bool parse_mov_arg();
-    bool parse_reg_arg();
-    bool parse_nul_arg();
-
-    bool parse_imm_(uint32_t*  imm_ptr);
-    bool parse_flt_(float*     flt_ptr);
-    bool parse_reg_(ERegister* reg_ptr);
-    bool parse_lbl_(uint32_t*  lbl_ptr);
-
-    void parse_call_args_();
-    void parse_jump_args_();
-    void parse_push_args_();
-    void parse_pop_args_ ();
-
-#define DECLARE_JUMP_PARSE_ARGS_(name) \
-    void parse_##name##_args_();
-
-    DECLARE_JUMP_PARSE_ARGS_(jmp)
-    DECLARE_JUMP_PARSE_ARGS_(jz )
-    DECLARE_JUMP_PARSE_ARGS_(jnz)
-    DECLARE_JUMP_PARSE_ARGS_(je )
-    DECLARE_JUMP_PARSE_ARGS_(jne)
-    DECLARE_JUMP_PARSE_ARGS_(jg )
-    DECLARE_JUMP_PARSE_ARGS_(jge)
-    DECLARE_JUMP_PARSE_ARGS_(jl )
-    DECLARE_JUMP_PARSE_ARGS_(jle)
-
-#undef DECLARE_JUMP_PARSE_ARGS_
+    bool parse_all_arg_(EArgument* arg_ptr);
+    bool parse_mov_arg_(EArgument* arg_ptr);
+    bool parse_reg_arg_(EArgument* arg_ptr);
+    bool parse_mem_arg_(EArgument* arg_ptr);
+    bool parse_imm_arg_(EArgument* arg_ptr);
+    bool parse_lbl_arg_(EArgument* arg_ptr);
+    bool parse_flt_arg_(EArgument* arg_ptr);
+    bool parse_nul_arg_(EArgument* arg_ptr);
 
 public:
     [[nodiscard]] bool ok() const;
@@ -254,7 +231,7 @@ CTranslator::CTranslator(const char* input_file_name, const char* output_file_na
         CRS_IF_HASH_GUARD  (hash_value_(0),)
 
         input_file_view_ (ECMapMode::MAP_READONLY_FILE,  input_file_name),
-        output_file_view_(ECMapMode::MAP_WRITEONLY_FILE, output_file_name, input_file_view_.get_file_view_size()),
+        output_file_view_(ECMapMode::MAP_WRITEONLY_FILE, output_file_name, 4*input_file_view_.get_file_view_size()),
 
         cur_in_pos_ (nullptr),
         cur_out_pos_(nullptr),
@@ -305,17 +282,19 @@ void CTranslator::parse_input()
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-    while (std::isspace(*cur_in_pos_)) cur_in_pos_++;
+    while (std::isspace(*cur_in_pos_))
+        cur_in_pos_++;
 
     CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
 
     while (*cur_in_pos_)
     {
-        ETokenType type = parse_command_();
-
-        if (type == ETokenType::TOK_LBL) continue;
-
-        if (*cur_in_pos_ == '\n' || *cur_in_pos_ == '\r')
+        ECommand cmd_type = ECommand::CMD_ERR_VALUE;
+        if (parse_cmd_(&cmd_type))
+            continue;
+        else if (parse_lbl_())
+            continue;
+        else if (*cur_in_pos_ == '\n' || *cur_in_pos_ == '\r')
         {
             while (std::isspace(*cur_in_pos_))
                 cur_in_pos_++;
@@ -324,10 +303,8 @@ void CTranslator::parse_input()
         }
         else if (*cur_in_pos_ == '\0')
             break;
-
-        else CRS_PROCESS_ERROR("parse_input: "
-                               "error: new line expected before \"%.16s\"",
-                               cur_in_pos_)
+        else
+            CRS_PROCESS_ERROR("unexpected token instead of command or label: %c", *cur_in_pos_)
     }
 
     label_container_.replace_bytes();
@@ -353,13 +330,37 @@ void CTranslator::shift_and_pass_spaces_(size_t shift)
     CRS_IF_GUARD(CRS_END_CHECK();)
 }
 
+void CTranslator::write_args_(char* cmd_pos, ECommand cmd, EArgument lhs_arg, EArgument rhs_arg)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    CRS_STATIC_LOG("write args: cmd=%#X lhs_arg=%#X rhs_arg=%#X", cmd, lhs_arg, rhs_arg);
+
+    if (cmd_pos - output_file_view_.get_file_view_str() >=
+        output_file_view_.get_file_view_size())
+        CRS_PROCESS_ERROR("write_args_ : cmd_pos is out of bounds: offset: %zu, size: %zu",
+                          cmd_pos - output_file_view_.get_file_view_str(),
+                          output_file_view_.get_file_view_size())
+
+    UWord word = UWord(SCommand(cmd, lhs_arg, rhs_arg));
+
+    #undef LHS_OFFSET
+    #undef RHS_OFFSET
+
+    CRS_CHECK_MEM_OPER(memcpy(cmd_pos, &word, sizeof(UWord)))//will be optimised for each level from -O1
+
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
+    CRS_IF_GUARD(CRS_END_CHECK();)
+}
+
 void CTranslator::write_word_(UWord word)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-    CRS_STATIC_LOG("write word: %#X", word.idx);
+    CRS_STATIC_LOG("write word: %#X", word.as_imm);
 
-    memcpy(cur_out_pos_, &word, sizeof(UWord));//will be optimised for each level from -O1
+    CRS_CHECK_MEM_OPER(memcpy(cur_out_pos_, &word, sizeof(UWord)))//will be optimised for each level from -O1
     cur_out_pos_ += sizeof(UWord);
 
     if (cur_out_pos_ - output_file_view_.get_file_view_str() >=
@@ -373,132 +374,164 @@ void CTranslator::write_word_(UWord word)
     CRS_IF_GUARD(CRS_END_CHECK();)
 }
 
-CTranslator::SToken CTranslator::parse_token_()
+bool CTranslator::parse_cmd_(ECommand* cmd_ptr)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-    SToken result = {};
-
-    float     flt_val = 0.0f;
-    uint32_t  idx_val = 0;
-    ERegister reg_val = REGISTERS_CNT;
-    uint32_t  lbl_val = 0;
-
-    if (parse_imm_(&idx_val))
-        result = {TOK_IMM, UWord(idx_val)};
-    else if (parse_flt_(&flt_val))
-        result = {TOK_FLT, UWord(flt_val)};
-    else if (parse_reg_(&reg_val))
-        result = {TOK_REG, UWord(static_cast<uint32_t>(reg_val))};
-    else if (parse_lbl_(&lbl_val))
-        result = {TOK_LBL, UWord(static_cast<uint32_t>(lbl_val))};
-    else
-        CRS_PROCESS_ERROR("parse_token_: unrecognizable token \"%.16s\"", cur_in_pos_)
-
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-
-    return result;
-}
-
-std::pair<CTranslator::SToken, CTranslator::SToken> CTranslator::parse_bracket_()
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    std::pair<SToken, SToken> result = std::make_pair(SToken(), SToken());
-
-    if (*cur_in_pos_ != '[')
-        CRS_PROCESS_ERROR("handle_bracket_: error: '[' missed before: \"%.16s\"", cur_in_pos_)
-
-    shift_and_pass_spaces_();
-
-    result.first = parse_token_();
-
-    if (*cur_in_pos_ == '+')
-    {
-        shift_and_pass_spaces_();
-        result.second = parse_token_();
-    }
-    else if (*cur_in_pos_ != ']')
-        CRS_PROCESS_ERROR("handle_bracket_: error: ']' missed before: \"%.16s\"", cur_in_pos_)
-
-    shift_and_pass_spaces_();
-
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-
-    return result;
-}
-
-bool CTranslator::parse_imm_(uint32_t* imm_ptr)
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    if (!imm_ptr)
-        CRS_PROCESS_ERROR("parse_imm_ error: imm_ptr is %p", imm_ptr)
+    if (!cmd_ptr)
+        CRS_PROCESS_ERROR("parse_cmd_ error: cmd_ptr is %p", cmd_ptr)
 
     bool result = false;
 
-    char* end_ptr = nullptr;
-    *imm_ptr = std::strtoul(cur_in_pos_, &end_ptr, 0);
-
-    if (end_ptr == cur_in_pos_)
-        result = false;
-    else if (*end_ptr == '.' || *end_ptr == 'e' || *end_ptr == 'E')
-        result = false;
-    else
-    {
-        result = true;
-        shift_and_pass_spaces_(end_ptr - cur_in_pos_);
-    }
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-
-    return result;
-}
-
-bool CTranslator::parse_flt_(float* flt_ptr)
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    if (!flt_ptr)
-        CRS_PROCESS_ERROR("parse_flt_ error: flt_ptr is %p", flt_ptr)
-
-    bool result = false;
-
-    char* end_ptr = nullptr;
-    *flt_ptr = std::strtof(cur_in_pos_, &end_ptr);
-
-    if (end_ptr == cur_in_pos_)
-        result = false;
-    else
-    {
-        result = true;
-        shift_and_pass_spaces_(end_ptr - cur_in_pos_);
-    }
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-
-    return result;
-}
-
-bool CTranslator::parse_reg_(ERegister* reg_ptr)
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    if (!reg_ptr)
-        CRS_PROCESS_ERROR("parse_reg_ error: reg_ptr is %p", reg_ptr)
-
-    bool result = false;
-
-    #define HANDLE_REGISTER_(enum_name, name) \
-        else if (!strncmp(cur_in_pos_, name, sizeof(name)-1)) \
+    #define HANDLE_COMMAND_(CMD_ENUM_NAME_, CMD_CODE_, CMD_NAME_, CMD_LHS_, CMD_RHS_) \
+        else if (!strncmp(cur_in_pos_, CRS_STRINGIZE(CMD_NAME_), sizeof(CRS_STRINGIZE(CMD_NAME_))-1) && \
+                 !std::isalnum(cur_in_pos_[sizeof(CRS_STRINGIZE(CMD_NAME_))-1])) \
         { \
-            shift_and_pass_spaces_(sizeof(name)-1); \
+            CRS_STATIC_MSG("parse_command: " CRS_STRINGIZE(CMD_NAME_) " command detected"); \
             \
-            *reg_ptr = ERegister:: enum_name; \
+            *cmd_ptr = ECommand:: CMD_ENUM_NAME_; \
+            \
+            command_pos_container_.push_back(cur_out_pos_); \
+            CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();) \
+            \
+            char* cmd_word_pos = cur_out_pos_; \
+            write_word_(UWord(SCommand(ECommand:: CMD_ENUM_NAME_, EArgument::ARG_ERR_VALUE, EArgument::ARG_ERR_VALUE))); \
+            shift_and_pass_spaces_(sizeof(CRS_STRINGIZE(CMD_NAME_))-1); \
+            \
+            EArgument lhs_arg = EArgument::ARG_ERR_VALUE; \
+            EArgument rhs_arg = EArgument::ARG_ERR_VALUE; \
+            \
+            if (!parse_##CMD_LHS_##_(&lhs_arg)) \
+                CRS_PROCESS_ERROR("parse_command: " CRS_STRINGIZE(CMD_NAME_) \
+                                  " left arg parse error on symbol %c", *cur_in_pos_) \
+            if (!parse_##CMD_RHS_##_(&rhs_arg)) \
+                CRS_PROCESS_ERROR("parse_command: " CRS_STRINGIZE(CMD_NAME_) \
+                                  " right arg parse error on symbol %c", *cur_in_pos_) \
+            \
+            write_args_(cmd_word_pos, ECommand:: CMD_ENUM_NAME_, lhs_arg, rhs_arg); \
+            \
+            result = true; \
+        }
+
+    if (*cur_in_pos_ == '\0')
+        CRS_STATIC_MSG("parse_command: end of file reached");
+
+        #include "../EnumLists/CommandList.h"
+
+    else
+    {
+        *cmd_ptr = ECommand::CMD_ERR_VALUE;
+
+        result = false;
+    }
+
+    #undef HANDLE_COMMAND_
+
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CTranslator::parse_lbl_()
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    bool result = false;
+
+    const char* temp_pos = cur_in_pos_;
+
+    if (std::isalpha(*temp_pos))
+    {
+        while (std::isalnum(*temp_pos))
+            temp_pos++;
+
+        std::string label_name(cur_in_pos_, temp_pos - cur_in_pos_);
+
+        while (*temp_pos == ' ' || *temp_pos == '\t')
+            temp_pos++;
+
+        if (*temp_pos == ':')
+        {
+            label_container_.push_label_declare(label_name, command_pos_container_.size());
+
+            ++temp_pos;
+            shift_and_pass_spaces_(temp_pos - cur_in_pos_);
+
+            result = true;
+        }
+        else
+            result = false;
+    }
+    else
+        result = false;
+
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CTranslator::parse_all_arg_(EArgument* arg_ptr)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_all_arg_ error: arg_ptr is %p", arg_ptr)
+
+    bool result = false;
+
+    if (parse_imm_arg_(arg_ptr))
+        result = true;
+    else if (parse_mov_arg_(arg_ptr))
+        result = true;
+    else if (parse_lbl_arg_(arg_ptr))
+        result = true;
+    else
+        result = false;
+
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CTranslator::parse_mov_arg_(EArgument* arg_ptr)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_mov_arg_ error: arg_ptr is %p", arg_ptr)
+
+    bool result = false;
+
+    if (parse_reg_arg_(arg_ptr))
+        result = true;
+    else if (parse_mem_arg_(arg_ptr))
+        result = true;
+    else
+        result = false;
+
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CTranslator::parse_reg_arg_(EArgument* arg_ptr)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_reg_arg_ error: arg_ptr is %p", arg_ptr)
+
+    bool result = false;
+
+    #define HANDLE_REGISTER_(REG_ENUM_NAME_, REG_NAME_) \
+        else if (!strncmp(cur_in_pos_, REG_NAME_, sizeof(REG_NAME_)-1)) \
+        { \
+            write_word_(UWord(ERegister:: REG_ENUM_NAME_)); \
+            shift_and_pass_spaces_(sizeof(REG_NAME_)-1); \
+            \
+            *arg_ptr = EArgument::ARG_REG; \
             result = true; \
         }
 
@@ -510,24 +543,126 @@ bool CTranslator::parse_reg_(ERegister* reg_ptr)
     else
         result = false;
 
+    if (!result)
+        *arg_ptr = EArgument::ARG_ERR_VALUE;
+
     #undef HANDLE_REGISTER_
 
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
 }
 
-bool CTranslator::parse_lbl_(uint32_t* lbl_ptr)
+bool CTranslator::parse_mem_arg_(EArgument* arg_ptr)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-    if (!lbl_ptr)
-        CRS_PROCESS_ERROR("parse_lbl_ error: lbl_ptr is %p", lbl_ptr)
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_mem_arg_ error: arg_ptr is %p", arg_ptr)
+
+    bool result = false;
+
+    if (*cur_in_pos_ == '[')
+    {
+        shift_and_pass_spaces_(1);
+
+        EArgument lhs_arg_type = EArgument::ARG_ERR_VALUE;
+        EArgument rhs_arg_type = EArgument::ARG_ERR_VALUE;
+
+        if (parse_imm_arg_(&lhs_arg_type))
+        {
+            *arg_ptr = EArgument::ARG_MEM_IMM;
+            result = true;
+        }
+        else if (parse_reg_arg_(&lhs_arg_type))
+        {
+            *arg_ptr = EArgument::ARG_MEM_REG;
+            result = true;
+        }
+        else
+            CRS_PROCESS_ERROR("parse_mem_arg_ error: unexpected symbol instead of imm or reg: %c", *cur_in_pos_)
+
+        if (*cur_in_pos_ == '+' && *arg_ptr == ARG_MEM_REG)
+        {
+            shift_and_pass_spaces_(1);
+
+            if (parse_imm_arg_(&rhs_arg_type))
+            {
+                *arg_ptr = EArgument::ARG_MEM_REG_IMM;
+                result = true;
+            }
+            else if (parse_reg_arg_(&rhs_arg_type))
+            {
+                *arg_ptr = EArgument::ARG_MEM_REG_REG;
+                result = true;
+            }
+            else
+                CRS_PROCESS_ERROR("parse_mem_arg_ error: unexpected symbol instead of '+' or ']': %c", *cur_in_pos_)
+        }
+
+        if (*cur_in_pos_ == ']')
+            shift_and_pass_spaces_(1);
+        else
+            CRS_PROCESS_ERROR("parse_mem_arg_ error: unexpected symbol instead of ']': %c", *cur_in_pos_)
+    }
+    else
+        result = false;
+
+    if (!result)
+        *arg_ptr = EArgument::ARG_ERR_VALUE;
+
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CTranslator::parse_imm_arg_(EArgument* arg_ptr)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_imm_arg_ error: arg_ptr is %p", arg_ptr)
+
+    bool result = false;
+
+    char* end_ptr = nullptr;
+    uint32_t imm_val = std::strtoul(cur_in_pos_, &end_ptr, 0);
+
+    if (end_ptr == cur_in_pos_)
+        result = false;
+    else if (*end_ptr == '.' || *end_ptr == 'e' || *end_ptr == 'E')
+        result = false;
+    else
+    {
+        write_word_(UWord(imm_val));
+        shift_and_pass_spaces_(end_ptr - cur_in_pos_);
+
+        *arg_ptr = EArgument::ARG_IMM;
+        result = true;
+    }
+
+    if (!result)
+        *arg_ptr = EArgument::ARG_ERR_VALUE;
+
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CTranslator::parse_lbl_arg_(EArgument* arg_ptr)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_lbl_arg_ error: arg_ptr is %p", arg_ptr)
 
     bool result = false;
 
     if (*cur_in_pos_ == '\0')
-        CRS_STATIC_MSG("parse_lbl_: end of file reached");
+        CRS_STATIC_MSG("parse_lbl_arg_: end of file reached");
     else if (std::isalpha(*cur_in_pos_))
     {
         const char* temp_pos = cur_in_pos_;
@@ -537,325 +672,78 @@ bool CTranslator::parse_lbl_(uint32_t* lbl_ptr)
         std::string label_name(cur_in_pos_, temp_pos - cur_in_pos_);
         shift_and_pass_spaces_(temp_pos - cur_in_pos_);
 
-        *lbl_ptr = label_container_.push_label_use_name(label_name);
+        uint32_t lbl_idx = label_container_.push_label_use_name(label_name);
+
+        CLabelContainer::SLabelUsePos use_pos = {};
+        use_pos.cmd_idx = static_cast<uint32_t>(command_pos_container_.size()-1);
+        use_pos.arg_ptr = cur_out_pos_;
+
+        label_container_.push_label_use_pos(use_pos);
+        write_word_(UWord(lbl_idx));
+
+        *arg_ptr = EArgument::ARG_LBL;
         result = true;
     }
     else
         result = false;
 
+    if (!result)
+        *arg_ptr = EArgument::ARG_ERR_VALUE;
+
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
 }
 
-void CTranslator::parse_call_args_()
+bool CTranslator::parse_flt_arg_(EArgument* arg_ptr)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-    SToken arg = {};
-    ECallMode mode = {};
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_flt_arg_ error: arg_ptr is %p", arg_ptr)
 
-    if (*cur_in_pos_ == '[')
-    {
-        auto bracket_args = parse_bracket_();
+    bool result = false;
 
-        arg = bracket_args.first;
-
-        switch (bracket_args.first.tok_type)
-        {
-            case ETokenType::TOK_IMM: mode = ECallMode::CALL_RAM;     break;
-            case ETokenType::TOK_REG: mode = ECallMode::CALL_RAM_REG; break;
-
-            default: CRS_PROCESS_ERROR("handle_call_args_: invalid ram request argument: "
-                                       "tok_type: %#x", arg.tok_type)
-        }
-
-        if (bracket_args.second.tok_type != ETokenType::TOK_NONE)
-            CRS_PROCESS_ERROR("handle_call_args_: invalid ram request argument: "
-                              "tok_type: %#x", arg.tok_type)
-    }
-    else
-    {
-        arg = parse_token_();
-
-        switch (arg.tok_type)
-        {
-            case ETokenType::TOK_IMM:
-            case ETokenType::TOK_LBL: mode = ECallMode::CALL_REL; break;
-            case ETokenType::TOK_REG: mode = ECallMode::CALL_REG; break;
-
-            default:
-                CRS_PROCESS_ERROR("handle_call_args_: invalid argument tok_type: %#x", arg.tok_type)
-            break;
-        }
-    }
-
-    write_word_(UWord(static_cast<uint32_t>(mode)));
-
-    if (arg.tok_type == ETokenType::TOK_LBL)
-    {
-        label_container_.push_label_use_pos({static_cast<uint32_t>(command_pos_container_.size()-1), cur_out_pos_});
-        write_word_(arg.tok_data);
-    }
-    else
-    {
-        write_word_(arg.tok_data);
-    }
-
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-}
-
-void CTranslator::parse_jump_args_()
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    SToken arg = {};
-    EJumpMode mode = {};
-
-    if (*cur_in_pos_ == '[')
-    {
-        auto bracket_args = parse_bracket_();
-
-        arg = bracket_args.first;
-
-        switch (bracket_args.first.tok_type)
-        {
-            case ETokenType::TOK_IMM: mode = EJumpMode::JUMP_RAM;     break;
-            case ETokenType::TOK_REG: mode = EJumpMode::JUMP_RAM_REG; break;
-
-            default: CRS_PROCESS_ERROR("handle_jump_args_: invalid ram request argument: "
-                                       "tok_type: %#x", arg.tok_type)
-        }
-
-        if (bracket_args.second.tok_type != ETokenType::TOK_NONE)
-            CRS_PROCESS_ERROR("handle_jump_args_: invalid ram request argument: "
-                              "tok_type: %#x", arg.tok_type)
-    }
-    else
-    {
-        arg = parse_token_();
-
-        switch (arg.tok_type)
-        {
-            case ETokenType::TOK_IMM:
-            case ETokenType::TOK_LBL: mode = EJumpMode::JUMP_REL; break;
-            case ETokenType::TOK_REG: mode = EJumpMode::JUMP_REG; break;
-
-            default:
-                CRS_PROCESS_ERROR("handle_jump_args_: invalid argument tok_type: %#x", arg.tok_type)
-            break;
-        }
-    }
-
-    write_word_(UWord(static_cast<uint32_t>(mode)));
-
-    if (arg.tok_type == ETokenType::TOK_LBL)
-    {
-        label_container_.push_label_use_pos({static_cast<uint32_t>(command_pos_container_.size()-1), cur_out_pos_});
-        write_word_(arg.tok_data);
-    }
-    else
-    {
-        write_word_(arg.tok_data);
-    }
-
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-}
-
-void CTranslator::parse_push_args_()
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    SToken arg = {}, add = {};
-    EPushMode mode = {};
-
-    if (*cur_in_pos_ == '[')
-    {
-        auto bracket_args = parse_bracket_();
-
-        arg = bracket_args.first;
-        add = bracket_args.second;
-
-        if      (arg.tok_type == ETokenType::TOK_IMM &&
-                 add.tok_type == ETokenType::TOK_NONE) mode = EPushMode::PUSH_RAM;
-        else if (arg.tok_type == ETokenType::TOK_REG &&
-                 add.tok_type == ETokenType::TOK_NONE) mode = EPushMode::PUSH_RAM_REG;
-        else if (arg.tok_type == ETokenType::TOK_REG &&
-                 add.tok_type == ETokenType::TOK_IMM) mode = EPushMode::PUSH_RAM_REG_NUM;
-        else if (arg.tok_type == ETokenType::TOK_REG &&
-                 add.tok_type == ETokenType::TOK_REG)  mode = EPushMode::PUSH_RAM_REG_REG;
-
-        else CRS_PROCESS_ERROR("parse_push_args_: error: invalid argument types: "
-                               "arg tok_type: %#x, add tok_type: %#x",
-                               arg.tok_type, add.tok_type)
-    }
-    else
-    {
-        arg = parse_token_();
-
-        if      (arg.tok_type == ETokenType::TOK_FLT) mode = EPushMode::PUSH_NUM;
-        else if (arg.tok_type == ETokenType::TOK_REG) mode = EPushMode::PUSH_REG;
-
-        else CRS_PROCESS_ERROR("parse_push_args_: error: invalid argument types: "
-                               "arg tok_type: %#x, add tok_type: %#x",
-                               arg.tok_type, add.tok_type)
-    }
-
-    write_word_(UWord(static_cast<uint32_t>(mode)));
-
-    if (arg.tok_type != ETokenType::TOK_NONE) write_word_(arg.tok_data);
-    if (add.tok_type != ETokenType::TOK_NONE) write_word_(add.tok_data);
-
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-}
-
-void CTranslator::parse_pop_args_()
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    SToken arg = {}, add = {};
-    EPopMode mode = {};
-
-    if (*cur_in_pos_ == '[')
-    {
-        auto bracket_args = parse_bracket_();
-
-        arg = bracket_args.first;
-        add = bracket_args.second;
-
-        if      (arg.tok_type == ETokenType::TOK_IMM &&
-                 add.tok_type == ETokenType::TOK_NONE) mode = EPopMode::POP_RAM;
-        else if (arg.tok_type == ETokenType::TOK_REG &&
-                 add.tok_type == ETokenType::TOK_NONE) mode = EPopMode::POP_RAM_REG;
-        else if (arg.tok_type == ETokenType::TOK_REG &&
-                 add.tok_type == ETokenType::TOK_IMM) mode = EPopMode::POP_RAM_REG_NUM;
-        else if (arg.tok_type == ETokenType::TOK_REG &&
-                 add.tok_type == ETokenType::TOK_REG)  mode = EPopMode::POP_RAM_REG_REG;
-
-        else CRS_PROCESS_ERROR("handle_pop_args_: error: invalid argument types: "
-                               "arg tok_type: %#x, add tok_type: %#x",
-                               arg.tok_type, add.tok_type)
-    }
-    else
-    {
-        arg = parse_token_();
-
-        if (arg.tok_type == ETokenType::TOK_REG) mode = EPopMode::POP_REG;
-
-        else CRS_PROCESS_ERROR("handle_pop_args_: error: invalid argument types: "
-                               "arg tok_type: %#x, add tok_type: %#x",
-                               arg.tok_type, add.tok_type)
-    }
-
-    write_word_(UWord(static_cast<uint32_t>(mode)));
-
-    if (arg.tok_type != ETokenType::TOK_NONE) write_word_(arg.tok_data);
-    if (add.tok_type != ETokenType::TOK_NONE) write_word_(add.tok_data);
-
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-}
-
-void CTranslator::parse_label_()
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    const char* temp_pos = cur_in_pos_;
-
-    while (std::isalnum(*temp_pos)) temp_pos++;
-    while (std::isspace(*temp_pos)) temp_pos++;
-
-    std::string label_name(cur_in_pos_, temp_pos - cur_in_pos_);
-    label_container_.push_label_declare(label_name, command_pos_container_.size());
-
-    if (*temp_pos == ':') temp_pos++;
-    else CRS_PROCESS_ERROR("parse_label_: error: ':' missed after \"%.16s\"", label_name.c_str())
-
-    shift_and_pass_spaces_(temp_pos - cur_in_pos_);
-
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
-    CRS_IF_GUARD(CRS_END_CHECK();)
-}
-
-CTranslator::ETokenType CTranslator::parse_command_()
-{
-    CRS_IF_GUARD(CRS_BEG_CHECK();)
-
-    ETokenType result = ETokenType::TOK_NONE;
-
-    #define NO_PARAM_PARSE_ARGS_(name, lhs, rhs)
-    #define PARAM_PARSE_ARGS_(name, lhs, rhs) parse_##name##_args_();
-
-    #define HANDLE_COMMAND_(enum_name, code, name, parametered, lhs, rhs) \
-        else if (!strncmp(cur_in_pos_, CRS_STRINGIZE(name), sizeof(CRS_STRINGIZE(name))-1) && \
-                 !std::isalnum(cur_in_pos_[sizeof(CRS_STRINGIZE(name))-1])) \
-        { \
-            CRS_STATIC_MSG("parse_command: " CRS_STRINGIZE(name) " command detected"); \
-            \
-            command_pos_container_.push_back(cur_out_pos_); \
-            CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();) \
-            \
-            write_word_(UWord(static_cast<uint32_t>(ECommand:: enum_name))); \
-            shift_and_pass_spaces_(sizeof(CRS_STRINGIZE(name))-1); \
-            \
-            parametered##_PARSE_ARGS_(name, lhs, rhs) \
-        }
+    char* end_ptr = nullptr;
+    float flt_val = std::strtof(cur_in_pos_, &end_ptr);
 
     if (*cur_in_pos_ == '\0')
-        CRS_STATIC_MSG("parse_command: end of file reached");
-
-    #include "../EnumLists/CommandList.h"
-
-    else if (isalpha(*cur_in_pos_))
+        CRS_STATIC_MSG("parse_flt_arg_: end of file reached");
+    else if (end_ptr == cur_in_pos_)
+        result = false;
+    else
     {
-        parse_label_();
+        write_word_(UWord(flt_val));
+        shift_and_pass_spaces_(end_ptr - cur_in_pos_);
 
-        result = ETokenType::TOK_LBL;
+        *arg_ptr = EArgument::ARG_FLT;
+        result = true;
     }
 
-    else CRS_PROCESS_ERROR("parse_command: unrecognizable command: \"%.16s\"", cur_in_pos_)
-
-    #undef HANDLE_COMMAND_
-
-    #undef NO_PARAM_PARSE_ARGS_
-    #undef PARAM_PARSE_ARGS_
+    if (!result)
+        *arg_ptr = EArgument::ARG_ERR_VALUE;
 
     CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
-
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
 }
 
-#define DECLARE_JUMP_PARSE_ARGS_(name) \
-    void CTranslator::parse_##name##_args_() \
-    { \
-        CRS_IF_GUARD(CRS_BEG_CHECK();) \
-        \
-        parse_jump_args_(); \
-        \
-        CRS_IF_GUARD(CRS_END_CHECK();) \
-    }
+bool CTranslator::parse_nul_arg_(EArgument* arg_ptr)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
 
-DECLARE_JUMP_PARSE_ARGS_(jmp)
-DECLARE_JUMP_PARSE_ARGS_(jz )
-DECLARE_JUMP_PARSE_ARGS_(jnz)
-DECLARE_JUMP_PARSE_ARGS_(je )
-DECLARE_JUMP_PARSE_ARGS_(jne)
-DECLARE_JUMP_PARSE_ARGS_(jg )
-DECLARE_JUMP_PARSE_ARGS_(jge)
-DECLARE_JUMP_PARSE_ARGS_(jl )
-DECLARE_JUMP_PARSE_ARGS_(jle)
+    if (!arg_ptr)
+        CRS_PROCESS_ERROR("parse_nul_arg_ error: arg_ptr is %p", arg_ptr)
 
-#undef DECLARE_JUMP_PARSE_ARGS_
+    bool result = true;
+    *arg_ptr = EArgument::ARG_NUL;
+
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
 
 bool CTranslator::ok() const
 {

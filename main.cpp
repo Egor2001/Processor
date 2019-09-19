@@ -17,18 +17,24 @@ enum
 
 int main(int argc, char* argv[])
 {
-    const char* file_name = "../asm/fib_recursive.txt";
+    const char* file_name = "../asm/test.txt";
 
     //for calling destructor, closing mapped files
+    try
     {
+        {
+            CTranslator translator(file_name, "../asm/executable.txt");
+            translator.parse_input();
+        }
 
-        CTranslator translator(file_name, "../asm/executable.txt");
-        translator.parse_input();
+        {
+            CProcessor proc("../asm/executable.txt");
+            proc.execute();
+        }
     }
-
+    catch (const std::exception& exc)
     {
-        CProcessor proc("../asm/executable.txt");
-        proc.execute();
+        printf("exception caught: %s", exc.what());
     }
 
     return 0;
