@@ -1,11 +1,13 @@
 in
-pop ax
+pop dx
 call func
-push ax
+push dx
+mov bx 1024
+mov [bx+5] dx
 out
 hlt
 
 func:
-    inc ax
+    inc dx
     ret
 

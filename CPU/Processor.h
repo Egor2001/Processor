@@ -267,6 +267,8 @@ void CProcessor::execute()
 
         //after proc_cmd_ REG_IP can change its value, but only relatively to REG_PC, so increment does not matter in that case
         proc_registers_[ERegister::REG_IP].as_imm = proc_registers_[ERegister::REG_PC].as_imm + 1;
+        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+
         proc_cmd_(ECommand(cmd.cmd_type), lhs_arg, rhs_arg);
     }
 
@@ -336,7 +338,7 @@ SArgument CProcessor::proc_arg_(EArgument arg_type, const char** cur_src_ptr) co
         case EArgument:: ARG_ENUM_NAME_: \
         { \
             result = proc_arg_##ARG_NAME_##_(*cur_src_ptr); \
-            *cur_src_ptr += ARG_LEN_; \
+            *cur_src_ptr += ARG_LEN_*sizeof(UWord); \
         } \
         break;
 
@@ -364,6 +366,7 @@ bool CProcessor::push_word_(UWord word)
     proc_stack_.push(word);
     result = true;
 
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -375,6 +378,7 @@ UWord CProcessor::pop_word_()
 
     UWord result = proc_stack_.pop();
 
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -421,6 +425,7 @@ bool CProcessor::move_word_(SArgument dest_arg, UWord word)
             CRS_PROCESS_ERROR("move_word_ error: arg type: %#x is not writable", dest_arg.arg_type)
     }
 
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -448,7 +453,7 @@ UWord CProcessor::pull_word_(SArgument src_arg)
             if (reg < PROC_REG_COUNT)
                 result = proc_registers_[reg];
             else
-                CRS_PROCESS_ERROR("move_word_ to reg error: "
+                CRS_PROCESS_ERROR("pull_word_ from reg error: "
                                   "%#x >= PROC_REG_COUNT=%#x", reg, PROC_REG_COUNT)
         }
         break;
@@ -460,7 +465,7 @@ UWord CProcessor::pull_word_(SArgument src_arg)
             if (mem_addr < PROC_RAM_SIZE)
                 result = proc_ram_[mem_addr];
             else
-                CRS_PROCESS_ERROR("move_word_ to mem error: "
+                CRS_PROCESS_ERROR("pull_word_ from mem error: "
                                   "%#x > PROC_RAM_SIZE=%#x", mem_addr, PROC_RAM_SIZE)
         }
         break;
@@ -469,6 +474,7 @@ UWord CProcessor::pull_word_(SArgument src_arg)
             CRS_PROCESS_ERROR("move_word_ error: arg type: %#x is not readable", src_arg.arg_type)
     }
 
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -513,7 +519,7 @@ SArgument CProcessor::proc_arg_reg_(const char* beg_ptr) const
         CRS_PROCESS_ERROR("proc_arg_reg_ error: beg_ptr is %p", beg_ptr)
 
     UWord word_reg = get_word_(beg_ptr, 0);
-    SArgument result = SArgument(word_reg.as_reg);
+    SArgument result = SArgument(ERegister(word_reg.as_reg));
 
     CRS_IF_GUARD(CRS_END_CHECK();)
 
@@ -768,6 +774,7 @@ bool CProcessor::proc_cmd_loop_helper_(SArgument arg)
     if (result)
         proc_registers_[ERegister::REG_IP].as_imm = static_cast<uint32_t>(next_cmd_addr);
 
+    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -790,7 +797,7 @@ bool CProcessor::proc_cmd_ret_helper_()
 
     return result;
 }
-
+//TODO: fix this dummy!
 bool CProcessor::proc_interrupt_()
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
@@ -835,7 +842,7 @@ bool CProcessor::proc_interrupt_()
                             result = push_word_(top) && push_word_(top); })
 
 //memory
-    //DECLARE_PROC_CMD(mov, { result = move_word_(lhs, pull_word_(rhs)); })
+    DECLARE_PROC_CMD(mov, { result = move_word_(lhs, pull_word_(rhs)); })
 
 //control-flow
     DECLARE_PROC_CMD(call, { result = proc_cmd_call_helper_(lhs); })

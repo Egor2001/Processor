@@ -28,7 +28,7 @@ HANDLE_COMMAND_(CMD_POP,  0x0021, pop,  mov_arg, nul_arg)
 HANDLE_COMMAND_(CMD_DUP,  0x0022, dup,  nul_arg, nul_arg)
 
 //memory
-//HANDLE_COMMAND_(CMD_MOV, 0x0040, mov, mov_arg all_arg)
+HANDLE_COMMAND_(CMD_MOV, 0x0040, mov, mov_arg, all_arg)
 
 //control-flow
 HANDLE_COMMAND_(CMD_CALL, 0x0060, call, all_arg, nul_arg)
