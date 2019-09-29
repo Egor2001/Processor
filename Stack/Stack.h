@@ -3,15 +3,14 @@
 
 #include <cstdlib>
 
-#include "Logger.h"
-
-#include "CourseException.h"
+#include "../Logger/Logger.h"
+#include "../Logger/CourseException.h"
 
 #define CRS_GUARD_LEVEL 3
 
-#include "Guard.h"
+#include "../Logger/Guard.h"
 
-namespace course_stack {
+namespace course_util {
 
 template<typename ElemType, size_t BufSize>
 class CStaticStack
@@ -39,7 +38,7 @@ public:
     ~CStaticStack();
 
 private:
-    [[nodiscard]]  size_t calc_hash_value_() const;
+    [[nodiscard]] size_t calc_hash_value_() const;
 
 public:
     [[nodiscard]] size_t size() const;
@@ -54,8 +53,8 @@ public:
 public:
     [[nodiscard]] size_t get_hash_value() const;
 
-    [[nodiscard]] bool ok() const;
-    void dump() const;
+    [[nodiscard]] bool ok() const noexcept;
+                  bool dump() const noexcept;
 
 private:
     CRS_IF_CANARY_GUARD(size_t beg_canary_;)
@@ -243,7 +242,7 @@ size_t CStaticStack<ElemType, BufSize>::get_hash_value() const
 }
 
 template<typename ElemType, size_t BufSize>
-bool CStaticStack<ElemType, BufSize>::ok() const
+bool CStaticStack<ElemType, BufSize>::ok() const noexcept
 {
     return (this && CRS_IF_CANARY_GUARD(beg_canary_ == CANARY_VALUE &&
                                         end_canary_ == CANARY_VALUE &&)
@@ -252,29 +251,35 @@ bool CStaticStack<ElemType, BufSize>::ok() const
 }
 
 template<typename ElemType, size_t BufSize>
-void CStaticStack<ElemType, BufSize>::dump() const
+bool CStaticStack<ElemType, BufSize>::dump() const noexcept
 {
-    CRS_STATIC_DUMP("CDynamicStack[%s, this : %p] \n"
+    CRS_STATIC_DUMP("CStaticStack[%s, this : %p] \n"
                     "{ \n"
-                    CRS_IF_CANARY_GUARD("    beg_canary_[%s] : %#X \n")
-                    CRS_IF_HASH_GUARD  ("    hash_value_[%s] : %#X \n")
+                    CRS_IF_CANARY_GUARD(
+                    "    beg_canary_[%s] : %#X \n"
+                    ) //CRS_IF_CANARY_GUARD
+                    CRS_IF_HASH_GUARD  (
+                    "    hash_value_[%s] : %#X \n"
+                    ) //CRS_IF_CANARY_GUARD
                     "    \n"
-                    //"    BUFFER_CAPASITY : %d \n"
                     "    size_           : %d \n"
                     "    buffer_         : %p \n"
                     "    \n"
-                    CRS_IF_CANARY_GUARD("    end_canary_[%s] : %#X \n")
+                    CRS_IF_CANARY_GUARD(
+                    "    end_canary_[%s] : %#X \n"
+                    ) //CRS_IF_CANARY_GUARD
                     "} \n",
 
                     (ok() ? "OK" : "ERROR"), this,
                     CRS_IF_CANARY_GUARD((beg_canary_ == CANARY_VALUE       ? "OK" : "ERROR"), beg_canary_,)
                     CRS_IF_HASH_GUARD  ((hash_value_ == calc_hash_value_() ? "OK" : "ERROR"), hash_value_,)
 
-                    //BUFFER_CAPASITY,
                     size_,
                     buffer_
 
                     CRS_IF_CANARY_GUARD(, (end_canary_ == CANARY_VALUE ? "OK" : "ERROR"), end_canary_));
+
+    return ok();
 }
 
 }

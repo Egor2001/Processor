@@ -8,9 +8,9 @@
 #include <cstring>
 #include <cctype>
 
-#include "../Stack/Logger.h"
-#include "../Stack/CourseException.h"
-#include "../Stack/Guard.h"
+#include "../Logger/Logger.h"
+#include "../Logger/CourseException.h"
+#include "../Logger/Guard.h"
 
 #include "../CPU/ProcessorEnums.h"
 
@@ -18,7 +18,7 @@
 
 namespace course {
 
-using namespace course_stack;
+using namespace course_util;
 
 class CTranslator final
 {

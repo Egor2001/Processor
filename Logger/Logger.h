@@ -11,7 +11,7 @@
 
 #include "Macro.h"
 
-namespace course_stack {
+namespace course_util {
 
 constexpr size_t crs_hash_helper(const char* str, std::size_t str_len) noexcept
 {
@@ -50,7 +50,7 @@ public:
     static CLogger* instance()
     {
         if (!instance_)
-            throw std::runtime_error("CLogger instance is null pointer");
+            throw std::runtime_error("CLogger get_instance is null pointer");
 
         return instance_.get();
     }
@@ -169,7 +169,7 @@ private:
     FILE*    log_file_;
 };
 
-std::shared_ptr<CLogger> CLogger::instance_ = std::make_shared<CLogger>("../Stack/Logs/log.txt", CLogger::ELogMode::LOG_DEBUG);
+std::shared_ptr<CLogger> CLogger::instance_ = std::make_shared<CLogger>("../Logger/Logs/log.txt", CLogger::ELogMode::LOG_DEBUG);
 
 }
 

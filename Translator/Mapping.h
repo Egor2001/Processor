@@ -124,7 +124,7 @@ DWORD CMapping::granularity = CMapping::get_granularity_();
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "../Stack/Logger.h"
+#include "../Logger/Logger.h"
 
 namespace course {
 

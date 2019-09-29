@@ -8,13 +8,13 @@
 #include <cstdint>
 #include <random>
 
-#include "Logger.h"
+#include "../Logger/Logger.h"
 
-#include "CourseException.h"
+#include "../Logger/CourseException.h"
 
 #define CRS_GUARD_LEVEL 3
 
-#include "Guard.h"
+#include "../Logger/Guard.h"
 
 namespace course_stack {
 
@@ -50,7 +50,7 @@ public:
         byte_storage_ = new char[capasity_*sizeof(type_t_) + alignof(type_t_)] { static_cast<char>(0xFF) };
         buffer_ = reinterpret_cast<pointer_t_>((std::uintptr_t(byte_storage_) + alignof(type_t_)-1) &
                                                -alignof(type_t_));
-        //(because of two’s complement)
+        //(because of twoï¿½s complement)
 
         for (size_t i = 0; i < size_; i++)
             new (buffer_ + i) type_t_();

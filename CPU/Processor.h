@@ -5,18 +5,21 @@
 #include <climits>
 #include <cmath>
 
-#include "../Stack/CourseException.h"
+#include "../Logger/CourseException.h"
 #include "../Stack/Stack.h"
 
-#include "../Stack/Guard.h"
+#include "../Logger/Guard.h"
 #include "ProcessorEnums.h"
+#include "MemoryEnums.h"
+#include "MemoryController.h"
+#include "Cache.h"
 
 #include "../Translator/FileView.h"
 
 namespace course {
 
-using namespace course_stack;
-using course_stack::operator "" _crs_hash;
+using namespace course_util;
+using course_util::operator "" _crs_hash;
 
 class CProcessor final
 {
@@ -41,12 +44,18 @@ public:
     void execute();
 
 private:
-    [[nodiscard]] size_t calc_hash_value_() const;
+    [[nodiscard]] size_t get_hash_value_() const;
 
     UWord get_word_(const char* cur_ptr, uint32_t word_num) const;
 
     uint32_t get_arg_len_(EArgument arg_val) const;
     SCommand get_cmd_() const;
+
+    bool direct_read_word_ (TAddr addr,       UWord* dest) const;
+    bool direct_write_word_(TAddr addr, const UWord* src);
+
+    bool cached_read_word_ (TAddr addr,       UWord* dest);
+    bool cached_write_word_(TAddr addr, const UWord* src);
 
     bool  push_word_(UWord word);
     UWord  pop_word_();
@@ -79,6 +88,8 @@ private:
     bool  proc_cmd_call_helper_(SArgument arg);
     bool  proc_cmd_loop_helper_(SArgument arg);
     bool  proc_cmd_ret_helper_ ();
+    bool  proc_cmd_cmp_helper_ (SArgument lhs, SArgument rhs);
+    bool  proc_cmd_fcmp_helper_(SArgument lhs, SArgument rhs);
 
     bool proc_interrupt_();
 
@@ -93,7 +104,7 @@ private:
 
 public:
     [[nodiscard]] bool ok() const noexcept;
-    void dump() const noexcept;
+                  bool dump() const noexcept;
 
 private:
     CRS_IF_CANARY_GUARD(size_t beg_canary_;)
@@ -102,13 +113,12 @@ private:
     CStaticStack<UWord, 64>      proc_stack_;
     CStaticStack<uint32_t, 1024> proc_call_stack_;
     UWord                        proc_registers_[PROC_REG_COUNT];
-    UWord                        proc_ram_      [PROC_RAM_SIZE];
+//    UWord                        proc_ram_      [PROC_RAM_SIZE];
+
+    std::shared_ptr<CMemoryController> proc_memory_controller_;
+    CCache                             proc_cache_;
 
     CFileView input_file_view_;
-
-//TODO: fix all appearances of program_counter_ with REG_PC
-
-//    uint32_t program_counter_;
     std::vector<const char*> instruction_pipe_;
 
     CRS_IF_CANARY_GUARD(size_t end_canary_;)
@@ -121,21 +131,23 @@ CProcessor::CProcessor(const char* input_file_name) :
     proc_stack_     (),
     proc_call_stack_(),
     proc_registers_ (),
-    proc_ram_       (),
+//    proc_ram_       (),
 
     input_file_view_(ECMapMode::MAP_READONLY_FILE, input_file_name),
 
-//    program_counter_(0),
+    proc_memory_controller_(CMemoryController::get_instance()),
+    proc_cache_(proc_memory_controller_),
+
     instruction_pipe_()
 
     CRS_IF_CANARY_GUARD(, end_canary_(CANARY_VALUE))
 {
     CRS_CHECK_MEM_OPER(memset(proc_registers_, 0x00, PROC_REG_COUNT*sizeof(UWord)))
-    CRS_CHECK_MEM_OPER(memset(proc_ram_,       0x00, PROC_RAM_SIZE *sizeof(UWord)))
+//    CRS_CHECK_MEM_OPER(memset(proc_ram_,       0x00, PROC_RAM_SIZE *sizeof(UWord)))
 
     proc_registers_[ERegister::REG_PC].as_imm = 0;
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
 
     CRS_IF_GUARD(CRS_CONSTRUCT_CHECK();)
 }
@@ -150,28 +162,35 @@ CProcessor::~CProcessor()
     proc_stack_     .clear();
     proc_call_stack_.clear();
     CRS_CHECK_MEM_OPER(memset(proc_registers_, 0x00, PROC_REG_COUNT*sizeof(UWord)))
-    CRS_CHECK_MEM_OPER(memset(proc_ram_,       0x00, PROC_RAM_SIZE *sizeof(UWord)))
+//    CRS_CHECK_MEM_OPER(memset(proc_ram_,       0x00, PROC_RAM_SIZE *sizeof(UWord)))
 
-    //program_counter_ = 0;
+    proc_memory_controller_ = nullptr;
+    proc_cache_.clear();
+
     proc_registers_[ERegister::REG_PC].as_imm = 0;
     instruction_pipe_.clear();
 }
 
-size_t CProcessor::calc_hash_value_() const
+size_t CProcessor::get_hash_value_() const
 {
     size_t result = proc_stack_     .get_hash_value() ^
-                    proc_call_stack_.get_hash_value();
-    //TODO: add registers via include
-    result ^= (CRS_IF_CANARY_GUARD((beg_canary_ ^ end_canary_) ^)
-               (proc_registers_[ERegister::REG_AX].as_imm << 0x8) ^
-               (proc_registers_[ERegister::REG_BX].as_imm << 0x4) ^
-               (proc_registers_[ERegister::REG_CX].as_imm >> 0x4) ^
-               (proc_registers_[ERegister::REG_DX].as_imm >> 0x8));
+                    proc_call_stack_.get_hash_value() ^
+                    proc_cache_     .get_hash_value();
 
-//    result ^= program_counter_;
+    CRS_IF_CANARY_GUARD(result ^= (beg_canary_ ^ end_canary_);)
+
+    #define HANDLE_REGISTER_(ENUM_NAME, NAME) \
+        result ^= proc_registers_[ERegister:: ENUM_NAME].as_imm;
+
+    #include "../EnumLists/RegisterList.h"
+    result ^= proc_registers_[ERegister::REG_SR].as_imm;
+    result ^= proc_registers_[ERegister::REG_PC].as_imm;
+    result ^= proc_registers_[ERegister::REG_IP].as_imm;
+
+    #undef HANDLE_REGISTER_
 
     for (size_t i = 0; i < instruction_pipe_.size(); i++)
-        result ^= (*instruction_pipe_[i] << (i%sizeof(size_t)));
+        result ^= (*instruction_pipe_[i] << static_cast<size_t>(i%sizeof(size_t)));
 
     return result;
 }
@@ -190,7 +209,7 @@ void CProcessor::load_commands()
         cur_pos += cur_cmd_len*sizeof(UWord);
 
         instruction_pipe_.push_back(cur_pos);
-        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+        CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
 
         SCommand cur_cmd = get_cmd_();
         cur_cmd_len = get_arg_len_(EArgument(cur_cmd.lhs_type)) +
@@ -202,7 +221,7 @@ void CProcessor::load_commands()
 
     instruction_pipe_.push_back(cur_pos);
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 }
 
@@ -258,6 +277,7 @@ void CProcessor::execute()
     {
         proc_registers_[ERegister::REG_PC].as_imm = proc_registers_[ERegister::REG_IP].as_imm;
         const char* cur_src = instruction_pipe_[proc_registers_[ERegister::REG_PC].as_imm];
+        CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
 
         SCommand cmd = get_word_(cur_src, 0).as_cmd;
         cur_src += sizeof(UWord);
@@ -267,14 +287,14 @@ void CProcessor::execute()
 
         //after proc_cmd_ REG_IP can change its value, but only relatively to REG_PC, so increment does not matter in that case
         proc_registers_[ERegister::REG_IP].as_imm = proc_registers_[ERegister::REG_PC].as_imm + 1;
-        CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+        CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
 
         proc_cmd_(ECommand(cmd.cmd_type), lhs_arg, rhs_arg);
     }
 
     proc_registers_[ERegister::REG_PC].as_imm = instruction_pipe_.size();
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 }
 
@@ -320,6 +340,7 @@ bool CProcessor::proc_cmd_(ECommand cmd_type, SArgument lhs_arg, SArgument rhs_a
 
     #undef HANDLE_COMMAND_
 
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -358,6 +379,77 @@ SArgument CProcessor::proc_arg_(EArgument arg_type, const char** cur_src_ptr) co
     return result;
 }
 
+bool CProcessor::direct_read_word_(TAddr addr, UWord* dest) const
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    bool result = false;
+
+    if (!dest)
+        CRS_PROCESS_ERROR("direct_read_word_ error: dest is %p", dest)
+
+    result = (proc_memory_controller_->mem_read_word(addr, dest) == EMemoryResult::MEM_RES_SUCCESS);
+
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CProcessor::direct_write_word_(TAddr addr, const UWord* src)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    bool result = false;
+
+    if (!src)
+        CRS_PROCESS_ERROR("direct_write_word_ error: src is %p", src)
+
+    result = (proc_memory_controller_->mem_write_word(addr, src) == EMemoryResult::MEM_RES_SUCCESS);
+
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CProcessor::cached_read_word_(TAddr addr, UWord* dest)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    bool result = false;
+
+    if (!dest)
+        CRS_PROCESS_ERROR("cached_read_word_ error: dest is %p", dest)
+
+    result = proc_cache_.try_read(addr, dest);
+    if (!result)
+        result = direct_read_word_(addr, dest) && proc_cache_.add_entry(addr);
+
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
+bool CProcessor::cached_write_word_(TAddr addr, const UWord* src)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    bool result = false;
+
+    if (!src)
+        CRS_PROCESS_ERROR("cached_write_word_ error: dest is %p", src)
+
+    result = proc_cache_.try_write(addr, src);
+    if (!result)
+        result = direct_write_word_(addr, src) && proc_cache_.add_entry(addr);
+
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+
+    return result;
+}
+
 bool CProcessor::push_word_(UWord word)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
@@ -366,7 +458,7 @@ bool CProcessor::push_word_(UWord word)
     proc_stack_.push(word);
     result = true;
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -378,7 +470,7 @@ UWord CProcessor::pop_word_()
 
     UWord result = proc_stack_.pop();
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -402,7 +494,7 @@ bool CProcessor::move_word_(SArgument dest_arg, UWord word)
             }
             else
                 CRS_PROCESS_ERROR("move_word_ to reg error: "
-                                  "%#x >= PROC_REG_COUNT=%#x", reg, PROC_REG_COUNT)
+                                  "%#x >= PROC_REG_COUNT=%#x", reg, static_cast<uint32_t>(PROC_REG_COUNT))
         }
         break;
 
@@ -410,14 +502,17 @@ bool CProcessor::move_word_(SArgument dest_arg, UWord word)
         {
             uint32_t mem_addr = dest_arg.arg_data.as_mem.mem_addr;
 
+            result = cached_write_word_(mem_addr, &word);
+/*
             if (mem_addr < PROC_RAM_SIZE)
             {
-                proc_ram_[mem_addr] = word;
+//                proc_ram_[mem_addr] = word;
                 result = true;
             }
             else
                 CRS_PROCESS_ERROR("move_word_ to mem error: "
-                                  "%#x > PROC_RAM_SIZE=%#x", mem_addr, PROC_RAM_SIZE)
+                                  "%#x > PROC_RAM_SIZE=%#x", mem_addr, static_cast<uint32_t>(PROC_RAM_SIZE))
+*/
         }
         break;
 
@@ -425,7 +520,7 @@ bool CProcessor::move_word_(SArgument dest_arg, UWord word)
             CRS_PROCESS_ERROR("move_word_ error: arg type: %#x is not writable", dest_arg.arg_type)
     }
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -454,7 +549,7 @@ UWord CProcessor::pull_word_(SArgument src_arg)
                 result = proc_registers_[reg];
             else
                 CRS_PROCESS_ERROR("pull_word_ from reg error: "
-                                  "%#x >= PROC_REG_COUNT=%#x", reg, PROC_REG_COUNT)
+                                  "%#x >= PROC_REG_COUNT=%#x", reg, static_cast<uint32_t>(PROC_REG_COUNT))
         }
         break;
 
@@ -462,11 +557,14 @@ UWord CProcessor::pull_word_(SArgument src_arg)
         {
             uint32_t mem_addr = src_arg.arg_data.as_mem.mem_addr;
 
+            cached_read_word_(mem_addr, &result);
+/*
             if (mem_addr < PROC_RAM_SIZE)
                 result = proc_ram_[mem_addr];
             else
                 CRS_PROCESS_ERROR("pull_word_ from mem error: "
-                                  "%#x > PROC_RAM_SIZE=%#x", mem_addr, PROC_RAM_SIZE)
+                                  "%#x > PROC_RAM_SIZE=%#x", mem_addr, static_cast<uint32_t>(PROC_RAM_SIZE))
+*/
         }
         break;
 
@@ -474,7 +572,7 @@ UWord CProcessor::pull_word_(SArgument src_arg)
             CRS_PROCESS_ERROR("move_word_ error: arg type: %#x is not readable", src_arg.arg_type)
     }
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -616,7 +714,7 @@ SArgument CProcessor::proc_arg_mem_reg_reg_(const char* beg_ptr) const
     UWord word_idx_reg = get_word_(beg_ptr, 0);
     UWord word_add_reg = get_word_(beg_ptr, 1);
     SMemoryAddr mem_addr = { proc_registers_[word_idx_reg.as_reg].as_imm +
-                             proc_registers_[word_idx_reg.as_reg].as_imm };
+                             proc_registers_[word_add_reg.as_reg].as_imm };
     SArgument result = SArgument(mem_addr);
 
     CRS_IF_GUARD(CRS_END_CHECK();)
@@ -662,6 +760,7 @@ bool CProcessor::proc_cmd_hlt_helper_()
     proc_registers_[ERegister::REG_IP].as_imm = instruction_pipe_.size();
     result = true;
 
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -724,12 +823,12 @@ bool CProcessor::proc_cmd_jump_helper_(SArgument arg)
 
     if (next_cmd_addr < 0 || next_cmd_addr >= instruction_pipe_.size())
         CRS_PROCESS_ERROR("proc_cmd_jump_helper error: next_cmd_addr %#X is out of bounds"
-                          "[0, %#X]", next_cmd_addr, instruction_pipe_.size())
+                          "[0, %#X]", next_cmd_addr, static_cast<uint32_t>(instruction_pipe_.size()))
 
     if (result)
         proc_registers_[ERegister::REG_IP].as_imm = static_cast<uint32_t>(next_cmd_addr);
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -742,7 +841,7 @@ bool CProcessor::proc_cmd_call_helper_(SArgument arg)
     bool result = false;
 
     proc_call_stack_.push(proc_registers_[ERegister::REG_PC].as_imm + 1);
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
 
     result = proc_cmd_jump_helper_(arg);
 
@@ -769,12 +868,12 @@ bool CProcessor::proc_cmd_loop_helper_(SArgument arg)
 
     if (next_cmd_addr < 0 || next_cmd_addr >= instruction_pipe_.size())
         CRS_PROCESS_ERROR("proc_cmd_loop_helper_ error: next_cmd_addr %#X is out of bounds"
-                          "[0, %#X]", next_cmd_addr, instruction_pipe_.size())
+                          "[0, %#X]", next_cmd_addr, static_cast<uint32_t>(instruction_pipe_.size()))
 
     if (result)
         proc_registers_[ERegister::REG_IP].as_imm = static_cast<uint32_t>(next_cmd_addr);
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
@@ -789,14 +888,15 @@ bool CProcessor::proc_cmd_ret_helper_()
     result = true;
 
     if (proc_registers_[ERegister::REG_IP].as_imm >= instruction_pipe_.size())
-        CRS_PROCESS_ERROR("proc_cmd_ret_helper_ error: REG_IP %#X is out of bounds"
-                          "[0, %#X]", proc_registers_[ERegister::REG_IP].as_imm, instruction_pipe_.size())
+        CRS_PROCESS_ERROR("proc_cmd_ret_helper_ error: REG_IP %#X is out of bounds [0, %#X]",
+                          proc_registers_[ERegister::REG_IP].as_imm, static_cast<uint32_t>(instruction_pipe_.size()))
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
 }
+
 //TODO: fix this dummy!
 bool CProcessor::proc_interrupt_()
 {
@@ -806,10 +906,31 @@ bool CProcessor::proc_interrupt_()
     proc_registers_[ERegister::REG_IP].as_imm = instruction_pipe_.size();
     result = true;
 
-    CRS_IF_HASH_GUARD(hash_value_ = calc_hash_value_();)
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
     CRS_IF_GUARD(CRS_END_CHECK();)
 
     return result;
+}
+
+//TODO: fix this dummy!
+bool CProcessor::proc_cmd_cmp_helper_(SArgument lhs, SArgument rhs)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    bool result = false;
+
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
+}
+
+bool CProcessor::proc_cmd_fcmp_helper_(SArgument lhs, SArgument rhs)
+{
+    CRS_IF_GUARD(CRS_BEG_CHECK();)
+
+    bool result = false;
+
+    CRS_IF_HASH_GUARD(hash_value_ = get_hash_value_();)
+    CRS_IF_GUARD(CRS_END_CHECK();)
 }
 
 #define DECLARE_PROC_CMD(name, implementation) \
@@ -820,7 +941,7 @@ bool CProcessor::proc_interrupt_()
         bool result = false; \
         implementation; \
         \
-        CRS_IF_GUARD(hash_value_ = calc_hash_value_();) \
+        CRS_IF_GUARD(hash_value_ = get_hash_value_();) \
         CRS_IF_GUARD(CRS_END_CHECK();) \
         \
         return result; \
@@ -887,7 +1008,7 @@ bool CProcessor::proc_interrupt_()
     DECLARE_PROC_CMD(xor, { result = move_word_(lhs, UWord(pull_word_(lhs).as_imm ^ pull_word_(rhs).as_imm)); })
     DECLARE_PROC_CMD(inv, { result = move_word_(lhs, UWord(~pull_word_(lhs).as_imm)); })
 
-    DECLARE_PROC_CMD(cmp, { ; })
+    DECLARE_PROC_CMD(cmp, { result = proc_cmd_cmp_helper_(lhs, rhs); })
 
 //TODO: carry out to FPU
 //TODO: replace NO_PARAM with PARAM
@@ -904,7 +1025,7 @@ bool CProcessor::proc_interrupt_()
     DECLARE_PROC_CMD(fcos,  { result = move_word_(lhs, UWord(cosf (pull_word_(lhs).as_flt))); })
     DECLARE_PROC_CMD(fsqrt, { result = move_word_(lhs, UWord(sqrtf(pull_word_(lhs).as_flt))); })
 
-    DECLARE_PROC_CMD(fcmp, { ; })
+    DECLARE_PROC_CMD(fcmp, { proc_cmd_fcmp_helper_(lhs, rhs); })
 
 //Will be defined in the end of EArgument
 //error
@@ -916,17 +1037,22 @@ bool CProcessor::ok() const noexcept
 {
     return (this && CRS_IF_CANARY_GUARD(beg_canary_ == CANARY_VALUE &&
                                         end_canary_ == CANARY_VALUE &&)
-            CRS_IF_HASH_GUARD(hash_value_ == calc_hash_value_() &&) proc_stack_.ok() &&
+            CRS_IF_HASH_GUARD(hash_value_ == get_hash_value_() &&)
+            proc_stack_.ok() && proc_cache_.ok() &&
             (proc_registers_[ERegister::REG_PC].as_imm <= instruction_pipe_.size() ||
              instruction_pipe_.size() == 0));
 }
 
-void CProcessor::dump() const noexcept
+bool CProcessor::dump() const noexcept
 {
     CRS_STATIC_DUMP("CProcessor[%s, this : %p] \n"
                     "{ \n"
-                    CRS_IF_CANARY_GUARD("    beg_canary_[%s] : %#X \n")
-                    CRS_IF_HASH_GUARD  ("    hash_value_[%s] : %#X \n")
+                    CRS_IF_CANARY_GUARD(
+                    "    beg_canary_[%s] : %#X \n"
+                    ) //CRS_IF_CANARY_GUARD
+                    CRS_IF_HASH_GUARD(
+                    "    hash_value_[%s] : %#X \n"
+                    ) //CRS_IF_HASH_GUARD
                     "    \n"
                     "    proc_stack_: \n"
                     "        size() : %d \n"
@@ -937,20 +1063,19 @@ void CProcessor::dump() const noexcept
                     "        [CX: %#x], \n"
                     "        [DX: %#x], \n"
                     "    } \n"
-                    "    proc_ram_ : \n"
-                    //"        size : %d \n"
+//                    "    proc_ram_ : \n"
                     "    \n"
                     "    instruction_pipe_ \n"
                     "        size() : %d \n"
                     "    \n"
-                    //"    program_counter_[%s] : %d \n"
-                    "    \n"
-                    CRS_IF_CANARY_GUARD("    end_canary_[%s] : %#X \n")
+                    CRS_IF_CANARY_GUARD(
+                    "    end_canary_[%s] : %#X \n"
+                    )
                     "} \n",
 
                     (ok() ? "OK" : "ERROR"), this,
                     CRS_IF_CANARY_GUARD((beg_canary_ == CANARY_VALUE       ? "OK" : "ERROR"), beg_canary_,)
-                            CRS_IF_HASH_GUARD  ((hash_value_ == calc_hash_value_() ? "OK" : "ERROR"), hash_value_,)
+                    CRS_IF_HASH_GUARD  ((hash_value_ == get_hash_value_() ? "OK" : "ERROR"), hash_value_,)
 
                     proc_stack_.size(),
 
@@ -963,10 +1088,10 @@ void CProcessor::dump() const noexcept
                     //PROC_RAM_SIZE,
 
                     instruction_pipe_.size()//,
-                    //(program_counter_ < instruction_pipe_.size() ? "OK" : "OUT_OF_RANGE"),
-                    //program_counter_
 
                     CRS_IF_CANARY_GUARD(, (end_canary_ == CANARY_VALUE ? "OK" : "ERROR"), end_canary_));
+
+    return ok();
 }
 
 }//namespace course

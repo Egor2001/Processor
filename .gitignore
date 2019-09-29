@@ -1,5 +1,7 @@
 # Logs
-Logs/*.txt
+**/log.txt
+**/Logs/**
+**/cmake-build*/**
 
 # Code::Blocks .save files and others
 *.save

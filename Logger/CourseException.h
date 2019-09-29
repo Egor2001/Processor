@@ -5,7 +5,7 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace course_stack {
+namespace course_util {
 
 class CCourseException : public std::exception
 {

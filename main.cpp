@@ -3,7 +3,7 @@
 #define CRS_GUARD_LEVEL 3
 //#define CRS_NO_LOGGING
 
-#include "Stack/Guard.h"
+#include "Logger/Guard.h"
 #include "CPU/Processor.h"
 #include "Translator/Translator.h"
 
