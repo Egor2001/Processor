@@ -1,7 +1,14 @@
+# Idea files
+*.idea/
+
 # Logs
 **/log.txt
 **/Logs/**
-**/cmake-build*/**
+**/cmake-build-debug
+
+# Output
+# Uncomment to exclude
+**/asm/**
 
 # Code::Blocks .save files and others
 *.save

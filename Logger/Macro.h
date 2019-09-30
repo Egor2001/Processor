@@ -58,7 +58,7 @@
 
 #define CRS_BEG_CHECK() \
 { \
-    CRS_STATIC_LOG("BEG functon check: %s", __func__); \
+/*    CRS_STATIC_LOG("BEG functon check: %s", __func__); */\
     \
     if (!this->ok()) \
         this->dump(); \
@@ -69,7 +69,7 @@
     if (!this->ok()) \
         this->dump(); \
     \
-    CRS_STATIC_LOG("END functon check: %s", __func__); \
+/*    CRS_STATIC_LOG("END functon check: %s", __func__); */\
 }
 
 #define CRS_PROCESS_ERROR(format_str, ...) \

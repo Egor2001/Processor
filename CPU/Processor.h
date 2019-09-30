@@ -382,6 +382,7 @@ SArgument CProcessor::proc_arg_(EArgument arg_type, const char** cur_src_ptr) co
 bool CProcessor::direct_read_word_(TAddr addr, UWord* dest) const
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
+    CRS_STATIC_LOG("CProcessor::direct_read_word_ %#X", addr);
 
     bool result = false;
 
@@ -398,6 +399,7 @@ bool CProcessor::direct_read_word_(TAddr addr, UWord* dest) const
 bool CProcessor::direct_write_word_(TAddr addr, const UWord* src)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
+    CRS_STATIC_LOG("CProcessor::direct_write_word_ %#X", addr);
 
     bool result = false;
 
@@ -415,6 +417,7 @@ bool CProcessor::direct_write_word_(TAddr addr, const UWord* src)
 bool CProcessor::cached_read_word_(TAddr addr, UWord* dest)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
+    CRS_STATIC_LOG("CProcessor::cached_read_word_ %#X", addr);
 
     bool result = false;
 
@@ -434,6 +437,7 @@ bool CProcessor::cached_read_word_(TAddr addr, UWord* dest)
 bool CProcessor::cached_write_word_(TAddr addr, const UWord* src)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
+    CRS_STATIC_LOG("CProcessor::cached_write_word_ %#X", addr);
 
     bool result = false;
 
@@ -503,16 +507,6 @@ bool CProcessor::move_word_(SArgument dest_arg, UWord word)
             uint32_t mem_addr = dest_arg.arg_data.as_mem.mem_addr;
 
             result = cached_write_word_(mem_addr, &word);
-/*
-            if (mem_addr < PROC_RAM_SIZE)
-            {
-//                proc_ram_[mem_addr] = word;
-                result = true;
-            }
-            else
-                CRS_PROCESS_ERROR("move_word_ to mem error: "
-                                  "%#x > PROC_RAM_SIZE=%#x", mem_addr, static_cast<uint32_t>(PROC_RAM_SIZE))
-*/
         }
         break;
 
@@ -558,13 +552,6 @@ UWord CProcessor::pull_word_(SArgument src_arg)
             uint32_t mem_addr = src_arg.arg_data.as_mem.mem_addr;
 
             cached_read_word_(mem_addr, &result);
-/*
-            if (mem_addr < PROC_RAM_SIZE)
-                result = proc_ram_[mem_addr];
-            else
-                CRS_PROCESS_ERROR("pull_word_ from mem error: "
-                                  "%#x > PROC_RAM_SIZE=%#x", mem_addr, static_cast<uint32_t>(PROC_RAM_SIZE))
-*/
         }
         break;
 
