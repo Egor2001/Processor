@@ -76,7 +76,7 @@ private:
         return node_list_.is_iter_valid(page_entry);
     }
 
-    THash get_hash_(TPage page) const noexcept
+    THash get_page_hash_(TPage page) const noexcept
     {
         page ^= 0xbad7face;
         uint8_t result = (0xFF & (page << 0x00)) ^
@@ -225,6 +225,7 @@ CCache::~CCache()
 bool CCache::try_read(uint32_t addr, UWord* dest_word_ptr) const
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
+    CRS_STATIC_LOG("CCache::try_read %#X", addr);
 
     bool result = false;
 
@@ -237,6 +238,9 @@ bool CCache::try_read(uint32_t addr, UWord* dest_word_ptr) const
 
         if (page_entry != CACHE_NULL_ENTRY)
         {
+            CRS_STATIC_LOG("CCache::try_read entry found %#X", page_entry);
+            CRS_STATIC_LOG("CCache::try_read read from (page = %#X) (offset = %#X)", page_entry, page_offset);
+
             std::memcpy(dest_word_ptr, byte_buf_ + (MEM_PAGE_SIZE * page_entry + page_offset), sizeof(UWord));
             node_list_.get_elem(page_entry).freq++;
 
@@ -256,6 +260,7 @@ bool CCache::try_read(uint32_t addr, UWord* dest_word_ptr) const
 bool CCache::try_write(uint32_t addr, const UWord* src_word_ptr)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
+    CRS_STATIC_LOG("CCache::try_write %#X", addr);
 
     bool result = false;
 
@@ -268,6 +273,9 @@ bool CCache::try_write(uint32_t addr, const UWord* src_word_ptr)
 
         if (page_entry != CACHE_NULL_ENTRY)
         {
+            CRS_STATIC_LOG("CCache::try_write entry found %#X", page_entry);
+            CRS_STATIC_LOG("CCache::try_write write to (page = %#X) (offset = %#X)", page_entry, page_offset);
+
             std::memcpy(byte_buf_ + (MEM_PAGE_SIZE * page_entry + page_offset), src_word_ptr, sizeof(UWord));
             node_list_.get_elem(page_entry).freq++;
             node_list_.get_elem(page_entry).flag |= EPageFlag::NODE_DIRTY;
@@ -289,6 +297,7 @@ bool CCache::try_write(uint32_t addr, const UWord* src_word_ptr)
 bool CCache::add_entry(uint32_t addr)
 {
     CRS_IF_GUARD(CRS_BEG_CHECK();)
+    CRS_STATIC_LOG("CCache::add_entry (addr = %#X)", addr);
 
     bool result = false;
 
@@ -296,6 +305,7 @@ bool CCache::add_entry(uint32_t addr)
     uint32_t page_offset = addr % MEM_PAGE_SIZE;
 
     uint32_t page_entry = find_page_entry(memory_page);
+    THash    page_hash  = get_page_hash_ (memory_page);
 
     if (page_entry != CACHE_NULL_ENTRY)
         result = true;
@@ -304,7 +314,7 @@ bool CCache::add_entry(uint32_t addr)
         if (node_list_.full())
             free_page_entry(find_less_used_page_entry());
 
-        page_entry = entry_map_[get_hash_(addr)];
+        page_entry = entry_map_[page_hash];
 
         if (page_entry != CACHE_NULL_ENTRY)
         {
@@ -313,10 +323,16 @@ bool CCache::add_entry(uint32_t addr)
         }
         else
         {
-            page_entry = node_list_.push_front(SNode{.page = memory_page, .flag = 0, .freq = 0});
+            entry_map_[page_hash] = node_list_.push_front(SNode{.page = memory_page, .flag = 0, .freq = 0});
+            page_entry = entry_map_[page_hash];
             result = (page_entry != CACHE_NULL_ENTRY);
         }
+
+        if (page_entry != CACHE_NULL_ENTRY)
+            fetch_entry_(page_entry);
     }
+
+    CRS_STATIC_LOG("CCache::add_entry (new entry = %#X)", page_entry);
 
     CRS_IF_HASH_GUARD(hash_value_ = get_hash_value();)
     CRS_IF_GUARD(CRS_END_CHECK();)
@@ -383,10 +399,10 @@ uint32_t CCache::find_page_entry(uint32_t page) const
     CRS_IF_GUARD(CRS_BEG_CHECK();)
 
     uint32_t result = CACHE_NULL_ENTRY;
-    uint8_t page_hash = get_hash_(page);
+    uint8_t page_hash = get_page_hash_(page);
 
     uint32_t iter = entry_map_[page_hash];
-    while ((iter != CACHE_NULL_ENTRY) && (get_hash_(node_list_.get_elem(iter).page) == page_hash) &&
+    while ((iter != CACHE_NULL_ENTRY) && (get_page_hash_(node_list_.get_elem(iter).page) == page_hash) &&
            node_list_.get_elem(iter).page != page)
     {
         iter = node_list_.get_next_it(iter);
